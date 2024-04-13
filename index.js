@@ -45,7 +45,7 @@ function streamMP3Files(mp3Files, res, jsonUrl, metadata) {
             currentIndex = 0;
         }
 
-        const mp3FilePath = mp3Files[currentIndex];
+        const mp3FilePath = mp3Files[currentIndex].file_path; // Access the file_path property from the mp3Files array
         const mp3Url = url.resolve(jsonUrl, mp3FilePath);
 
         // Read metadata for the current MP3 file
