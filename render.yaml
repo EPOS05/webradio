@@ -1,0 +1,6 @@
+services:
+  - name: webradio
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    httpPort: 8080

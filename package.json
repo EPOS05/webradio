@@ -1,0 +1,13 @@
+{
+    "name": "webradio",
+    "version": "1.0.0",
+    "description": "Server for continuously playing MP3 files provided in a JSON list",
+    "main": "index.js",
+    "scripts": {
+      "start": "node index.js"
+    },
+    "dependencies": {
+      "express": "^4.17.1"
+    }
+  }
+  
