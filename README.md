@@ -5,7 +5,7 @@ Clone this repository -> run the python script in order to generate your own jso
 
 <br>
 
-Replace [json url] with your own url:
+Replace **[json url]** with your own url:
 
 ```
 https://webradio.onrender.com/play?json=[json url]
