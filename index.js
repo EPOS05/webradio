@@ -1,7 +1,7 @@
 const express = require('express');
+const fs = require('fs');
 const https = require('https');
 const { Readable } = require('stream');
-const url = require('url');
 
 const app = express();
 
@@ -15,15 +15,9 @@ function fetchMP3FilesJSON(jsonFileUrl) {
             });
             response.on('end', () => {
                 try {
-                    // Check if response is JSON
-                    if (response.headers['content-type'].includes('application/json')) {
-                        const json = JSON.parse(data);
-                        const mp3Files = json.mp3_files;
-                        resolve(mp3Files);
-                    } else {
-                        console.error('Error fetching JSON: Response is not JSON');
-                        reject('Response is not JSON');
-                    }
+                    const json = JSON.parse(data);
+                    const mp3Files = json.mp3_files;
+                    resolve(mp3Files);
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
                     reject(error);
@@ -37,7 +31,7 @@ function fetchMP3FilesJSON(jsonFileUrl) {
 }
 
 // Function to stream MP3 files
-function streamMP3Files(mp3Files, res, jsonUrl) {
+function streamMP3Files(mp3Files, res) {
     const stream = new Readable({
         read() {}
     });
@@ -50,19 +44,14 @@ function streamMP3Files(mp3Files, res, jsonUrl) {
             currentIndex = 0;
         }
 
-        const mp3FilePath = mp3Files[currentIndex];
-        const mp3Url = url.resolve(jsonUrl, mp3FilePath);
-        https.get(mp3Url, (response) => {
-            response.pipe(res, { end: false });
-            response.on('end', () => {
-                currentIndex++;
-                playNext();
-            });
-        }).on('error', (error) => {
+        const filePath = mp3Files[currentIndex];
+        const streamFile = fs.createReadStream(filePath);
+        streamFile.on('error', (error) => {
             console.error('Error streaming file:', error);
-            currentIndex++;
-            playNext();
         });
+        streamFile.on('end', playNext);
+        streamFile.pipe(res, { end: false });
+        currentIndex++;
     };
 
     playNext();
@@ -70,9 +59,23 @@ function streamMP3Files(mp3Files, res, jsonUrl) {
 
 // Route to play MP3 files
 app.get('/play', (req, res) => {
+    const mp3Url = req.query.mp3;
     const jsonUrl = req.query.json;
 
-    if (jsonUrl) {
+    if (mp3Url) {
+        // Stream MP3 file directly
+        res.status(200).set({
+            'Content-Type': 'audio/mpeg',
+            'Connection': 'keep-alive',
+            'Transfer-Encoding': 'chunked'
+        });
+        https.get(mp3Url, (response) => {
+            response.pipe(res);
+        }).on('error', (error) => {
+            console.error('Error fetching MP3:', error);
+            res.status(500).send('Internal Server Error');
+        });
+    } else if (jsonUrl) {
         // Fetch MP3 files from JSON URL
         fetchMP3FilesJSON(jsonUrl)
             .then(mp3Files => {
@@ -80,14 +83,14 @@ app.get('/play', (req, res) => {
                     return res.status(400).send('No MP3 files available.');
                 }
                 // Stream MP3 files
-                streamMP3Files(mp3Files, res, jsonUrl);
+                streamMP3Files(mp3Files, res);
             })
             .catch(error => {
                 console.error('Error fetching MP3 files:', error);
                 res.status(500).send('Internal Server Error');
             });
     } else {
-        res.status(400).send('JSON URL not provided.');
+        res.status(400).send('Neither MP3 URL nor JSON URL provided.');
     }
 });
 
