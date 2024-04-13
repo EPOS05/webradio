@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streaming Site</title>
+</head>
+
+<body>
+    <h1>Streaming Site</h1>
+
+    <!-- Hidden audio element for playback -->
+    <audio id="audioPlayer" style="display: none;"></audio>
+
+    <script>
+        // Function to parse query parameters from URL
+        function getQueryParameter(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        // Function to fetch MP3 files JSON
+        async function fetchMP3FilesJSON(jsonFileUrl) {
+            try {
+                const response = await fetch(jsonFileUrl);
+                if (response.ok) {
+                    const json = await response.json();
+                    const mp3Files = json.mp3_files;
+                    if (mp3Files.length > 0) {
+                        // Start playing audio
+                        playAudio(mp3Files);
+                    } else {
+                        console.log('No MP3 files available in JSON.');
+                    }
+                } else {
+                    console.error("Fetch Error:", response.statusText);
+                }
+            } catch (error) {
+                console.error('Error fetching MP3 files JSON:', error);
+            }
+        }
+
+        // Function to play audio directly from MP3 URL
+        function playAudioFromUrl(mp3Url) {
+            const audioPlayer = document.getElementById('audioPlayer');
+            audioPlayer.src = mp3Url;
+            console.log("Loading MP3:", mp3Url);
+            audioPlayer.autoplay = true;
+            audioPlayer.play()
+                .then(() => {
+                    console.log("Playing MP3:", mp3Url);
+                })
+                .catch(error => console.error("Error playing MP3:", mp3Url, error));
+        }
+
+        // Function to play audio
+        function playAudio(mp3Files) {
+            const audioPlayer = document.getElementById('audioPlayer');
+            let currentIndex = 0;
+
+            // Play the first audio file
+            playNext();
+
+            function playNext() {
+                // Set source of audio player to the current file
+                audioPlayer.src = mp3Files[currentIndex];
+                console.log("Loading:", audioPlayer.src);
+
+                // Autoplay audio
+                audioPlayer.autoplay = true;
+
+                // Play audio
+                audioPlayer.play()
+                    .then(() => {
+                        console.log("Playing:", mp3Files[currentIndex]);
+                    })
+                    .catch(error => console.error("Error playing:", mp3Files[currentIndex], error));
+
+                // Move to next audio file after current one finishes
+                audioPlayer.onended = () => {
+                    if (currentIndex < mp3Files.length - 1) {
+                        // Increment currentIndex to move to the next file
+                        currentIndex++;
+                        // Play the next audio file
+                        playNext();
+                    } else {
+                        console.log('All MP3 files played.');
+                    }
+                };
+            }
+        }
+
+
+        // Fetch MP3 files JSON or play MP3 from URL when the page loads
+        const jsonFileUrl = getQueryParameter('json');
+        const mp3Url = getQueryParameter('mp3');
+        if (mp3Url) {
+            playAudioFromUrl(mp3Url);
+        } else if (jsonFileUrl) {
+            fetchMP3FilesJSON(jsonFileUrl);
+        } else {
+            console.error('MP3 URL or JSON file URL not provided.');
+        }
+    </script>
+</body>
+
+</html>
