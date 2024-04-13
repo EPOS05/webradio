@@ -16,7 +16,15 @@ function fetchMP3FilesJSON(jsonFileUrl) {
             response.on('end', () => {
                 try {
                     const json = JSON.parse(data);
-                    const mp3Files = json.mp3_files;
+                    const mp3Files = json.mp3_files.map((mp3, index) => ({
+                        id: index + 1,
+                        file_path: mp3.file_path,
+                        title: mp3.title || '',
+                        artist: mp3.artist || '',
+                        album: mp3.album || '',
+                        year: mp3.year || '',
+                        cover_art_path: mp3.cover_art_path || ''
+                    }));
                     resolve(mp3Files);
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
@@ -31,7 +39,7 @@ function fetchMP3FilesJSON(jsonFileUrl) {
 }
 
 // Function to stream MP3 files
-function streamMP3Files(mp3Files, res, jsonUrl) {
+function streamMP3Files(mp3Files, res) {
     const stream = new Readable({
         read() {}
     });
@@ -44,25 +52,18 @@ function streamMP3Files(mp3Files, res, jsonUrl) {
             currentIndex = 0;
         }
 
-        const mp3File = mp3Files[currentIndex];
-        const mp3Url = url.resolve(jsonUrl, mp3File.file_path);
-        
-        // Prepare ICY metadata
-        const icyMetadata = {
-            StreamTitle: `${mp3File.title} - ${mp3File.artist}`,
-            StreamUrl: jsonUrl,
-            StreamAlbum: mp3File.album,
-            StreamYear: mp3File.year,
-            StreamCover: mp3File.cover_art_path
-        };
-        
-        // Stream MP3 file with ICY metadata
-        const icyHeaders = Object.entries(icyMetadata)
-            .map(([key, value]) => `icy-${key}: ${value}`)
-            .join('\r\n') + '\r\n\r\n';
-        res.write(icyHeaders);
-        
+        const mp3 = mp3Files[currentIndex];
+        const mp3Url = url.resolve(jsonUrl, mp3.file_path);
         https.get(mp3Url, (response) => {
+            // Add metadata to the response headers
+            res.setHeader('Content-Type', 'audio/mpeg');
+            res.setHeader('Title', mp3.title);
+            res.setHeader('Artist', mp3.artist);
+            res.setHeader('Album', mp3.album);
+            res.setHeader('Year', mp3.year);
+            if (mp3.cover_art_path) {
+                res.setHeader('Cover-Art', mp3.cover_art_path);
+            }
             response.pipe(res, { end: false });
             response.on('end', () => {
                 currentIndex++;
@@ -90,7 +91,7 @@ app.get('/play', (req, res) => {
                     return res.status(400).send('No MP3 files available.');
                 }
                 // Stream MP3 files
-                streamMP3Files(mp3Files, res, jsonUrl);
+                streamMP3Files(mp3Files, res);
             })
             .catch(error => {
                 console.error('Error fetching MP3 files:', error);
