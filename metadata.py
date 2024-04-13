@@ -23,7 +23,7 @@ def extract_metadata(mp3_folder):
                     # Add more fields as needed
                 }
                 metadata_list.append(metadata)
-    return metadata_list
+    return {"mp3_files": metadata_list}  # Wrap metadata_list in 'mp3_files' key
 
 def extract_album_art(audio):
     for tag in audio.tags.values():
@@ -31,13 +31,10 @@ def extract_album_art(audio):
             # Encode album art data to Base64
             return base64.b64encode(tag.data).decode('utf-8')
 
-def save_metadata_to_json(metadata_list, output_file):
-    with open(output_file, "w") as f:
-        json.dump(metadata_list, f, indent=4)
-
 if __name__ == "__main__":
     mp3_folder = "mp3/"
     output_file = "metadata.json"
-    metadata_list = extract_metadata(mp3_folder)
-    save_metadata_to_json(metadata_list, output_file)
+    metadata = extract_metadata(mp3_folder)
+    with open(output_file, "w") as f:
+        json.dump(metadata, f, indent=4)
     print(f"Metadata saved to {output_file}")

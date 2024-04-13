@@ -1,34 +1,36 @@
-[
-    {
-        "file": "mp3/audio four.mp3",
-        "title": "",
-        "artist": "",
-        "album": "",
-        "genre": "",
-        "album_art": null
-    },
-    {
-        "file": "mp3/audio one.mp3",
-        "title": "",
-        "artist": "",
-        "album": "",
-        "genre": "",
-        "album_art": null
-    },
-    {
-        "file": "mp3/audio three.mp3",
-        "title": "",
-        "artist": "",
-        "album": "",
-        "genre": "",
-        "album_art": null
-    },
-    {
-        "file": "mp3/audio two.mp3",
-        "title": "",
-        "artist": "",
-        "album": "",
-        "genre": "",
-        "album_art": null
-    }
-]
+{
+    "mp3_files": [
+        {
+            "file": "mp3/audio four.mp3",
+            "title": "",
+            "artist": "",
+            "album": "",
+            "genre": "",
+            "album_art": null
+        },
+        {
+            "file": "mp3/audio one.mp3",
+            "title": "",
+            "artist": "",
+            "album": "",
+            "genre": "",
+            "album_art": null
+        },
+        {
+            "file": "mp3/audio three.mp3",
+            "title": "",
+            "artist": "",
+            "album": "",
+            "genre": "",
+            "album_art": null
+        },
+        {
+            "file": "mp3/audio two.mp3",
+            "title": "",
+            "artist": "",
+            "album": "",
+            "genre": "",
+            "album_art": null
+        }
+    ]
+}
