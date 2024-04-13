@@ -43,7 +43,7 @@ function streamMP3Files(mp3Files, res) {
             currentIndex = 0;
         }
 
-        const filePath = mp3Files[currentIndex];
+        const filePath = encodeURI(mp3Files[currentIndex]);
         const mp3Url = new URL(filePath);
         https.get(mp3Url, (response) => {
             response.pipe(res, { end: false });
