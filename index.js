@@ -30,11 +30,12 @@ function fetchMP3FilesJSON(jsonFileUrl) {
 }
 
 // Function to stream MP3 files from JSON
-function streamMP3FilesFromJSON(jsonUrl, res) {
-    fetchMP3FilesJSON(jsonUrl)
+function streamMP3FilesFromJSON(jsonFileUrl, res) {
+    fetchMP3FilesJSON(jsonFileUrl)
         .then(json => {
+            console.log('Received JSON data:', json); // Log received JSON data
             const mp3Files = json.mp3_files;
-            if (mp3Files.length === 0) {
+            if (!mp3Files || mp3Files.length === 0) {
                 return res.status(400).send('No MP3 files available.');
             }
             // Stream MP3 files
