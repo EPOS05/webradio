@@ -2,7 +2,6 @@ const express = require('express');
 const fs = require('fs');
 const https = require('https');
 const { Readable } = require('stream');
-const mm = require('music-metadata');
 
 const app = express();
 
@@ -31,39 +30,21 @@ function fetchMP3FilesJSON(jsonFileUrl) {
     });
 }
 
-// Function to stream MP3 files with metadata
-async function streamMP3FilesWithMetadata(mp3Files, res) {
+// Function to stream MP3 files
+function streamMP3Files(mp3Files, res) {
+    const stream = new Readable({
+        read() {}
+    });
+
     let currentIndex = 0;
 
-    const playNext = async () => {
+    const playNext = () => {
         if (currentIndex >= mp3Files.length) {
             // Loop back to the first audio file
             currentIndex = 0;
         }
 
         const filePath = mp3Files[currentIndex];
-
-        // Read metadata from MP3 file
-        const metadata = await mm.parseFile(filePath);
-        const { common } = metadata;
-        const { title, artist, album, picture } = common;
-
-        // Set headers for metadata
-        res.set({
-            'Content-Type': 'audio/mpeg',
-            'Connection': 'keep-alive',
-            'Transfer-Encoding': 'chunked',
-            'Title': title || '',
-            'Artist': artist || '',
-            'Album': album || ''
-        });
-
-        // If there's album art, stream it as well
-        if (picture && picture.length > 0) {
-            res.set('Album-Art', Buffer.from(picture[0].data).toString('base64'));
-        }
-
-        // Stream the MP3 file
         const streamFile = fs.createReadStream(filePath);
         streamFile.on('error', (error) => {
             console.error('Error streaming file:', error);
@@ -76,14 +57,24 @@ async function streamMP3FilesWithMetadata(mp3Files, res) {
     playNext();
 }
 
-// Route to play MP3 files with metadata
+// Route to play MP3 files
 app.get('/play', (req, res) => {
     const mp3Url = req.query.mp3;
     const jsonUrl = req.query.json;
 
     if (mp3Url) {
         // Stream MP3 file directly
-        res.status(200).send('Direct MP3 streaming is not supported with metadata.');
+        res.status(200).set({
+            'Content-Type': 'audio/mpeg',
+            'Connection': 'keep-alive',
+            'Transfer-Encoding': 'chunked'
+        });
+        https.get(mp3Url, (response) => {
+            response.pipe(res);
+        }).on('error', (error) => {
+            console.error('Error fetching MP3:', error);
+            res.status(500).send('Internal Server Error');
+        });
     } else if (jsonUrl) {
         // Fetch MP3 files from JSON URL
         fetchMP3FilesJSON(jsonUrl)
@@ -91,8 +82,8 @@ app.get('/play', (req, res) => {
                 if (mp3Files.length === 0) {
                     return res.status(400).send('No MP3 files available.');
                 }
-                // Stream MP3 files with metadata
-                streamMP3FilesWithMetadata(mp3Files, res);
+                // Stream MP3 files
+                streamMP3Files(mp3Files, res);
             })
             .catch(error => {
                 console.error('Error fetching MP3 files:', error);
