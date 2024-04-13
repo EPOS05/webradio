@@ -15,9 +15,15 @@ function fetchMP3FilesJSON(jsonFileUrl) {
             });
             response.on('end', () => {
                 try {
-                    const json = JSON.parse(data);
-                    const mp3Files = json.mp3_files;
-                    resolve(mp3Files);
+                    // Check if response is JSON
+                    if (response.headers['content-type'].includes('application/json')) {
+                        const json = JSON.parse(data);
+                        const mp3Files = json.mp3_files;
+                        resolve(mp3Files);
+                    } else {
+                        console.error('Error fetching JSON: Response is not JSON');
+                        reject('Response is not JSON');
+                    }
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
                     reject(error);
