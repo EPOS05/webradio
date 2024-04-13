@@ -18,7 +18,7 @@ function fetchMP3FilesJSON(jsonFileUrl) {
                 try {
                     const json = JSON.parse(data);
                     const mp3Files = json.mp3_files;
-                    resolve(mp3Files);
+                    resolve({ mp3Files, metadata: json.metadata || [] });
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
                     reject(error);
@@ -32,71 +32,54 @@ function fetchMP3FilesJSON(jsonFileUrl) {
 }
 
 // Function to stream MP3 files
-function streamMP3Files(mp3Files, res, jsonUrl) {
+function streamMP3Files(mp3Files, res, jsonUrl, metadata) {
+    const stream = new Readable({
+        read() {}
+    });
+
     let currentIndex = 0;
 
     const playNext = () => {
         if (currentIndex >= mp3Files.length) {
-            // Reset index if all MP3 files have been streamed
+            // Loop back to the first audio file
             currentIndex = 0;
         }
 
-        const mp3Data = mp3Files[currentIndex];
-        const mp3FilePath = mp3Data.file_path;
+        const mp3FilePath = mp3Files[currentIndex];
         const mp3Url = url.resolve(jsonUrl, mp3FilePath);
-        const coverArtPath = mp3Data.cover_art_path;
+
+        // Read metadata for the current MP3 file
+        const currentMetadata = metadata[currentIndex] || {};
+        const { title = '', artist = '', album = '', year = '', cover_art_path = '' } = currentMetadata;
 
         // Create ICY metadata
-        const metadata = `StreamTitle='${mp3Data.title} - ${mp3Data.artist} - ${mp3Data.album} - ${mp3Data.year}';`;
+        const icyMetadata = `StreamTitle='${title} - ${artist} - ${album} - ${year}';`;
 
-        // Write metadata headers to response
-        res.writeHead(200, {
-            'Content-Type': 'audio/mpeg',
-            'icy-name': 'Your Radio Name',
-            'icy-genre': 'Your Radio Genre',
-            'icy-metadata': '1', // Enable ICY metadata
-            'icy-metaint': '16000', // Send metadata every 16KB
-        });
+        // Pipe ICY metadata to the response
+        res.write('HTTP/1.1 200 OK\r\n');
+        res.write('Content-Type: audio/mpeg\r\n');
+        res.write(`icy-metaint: ${icyMetadata.length}\r\n`);
+        res.write('\r\n');
 
         // Stream MP3 file
-        const mp3Stream = https.get(mp3Url, (response) => {
-            response.pipe(res, { end: false });
+        const mp3Stream = fs.createReadStream(mp3FilePath);
+        mp3Stream.pipe(res, { end: false });
 
-            response.on('end', () => {
-                currentIndex++; // Move to the next MP3 file
-                playNext(); // Stream the next MP3 file
-            });
-        });
-
-        // Handle errors while streaming MP3 file
-        mp3Stream.on('error', (error) => {
-            console.error('Error streaming file:', error);
-            currentIndex++; // Move to the next MP3 file
-            playNext(); // Stream the next MP3 file
-        });
-
-        // Send metadata with each chunk of data
-        mp3Stream.on('data', (chunk) => {
-            res.write(chunk);
-            res.write(metadata); // Send metadata with each chunk
-        });
-
-        // Stream cover art if available
-        if (coverArtPath) {
-            const coverArtStream = fs.createReadStream(coverArtPath);
+        // Handle cover art if available
+        if (cover_art_path) {
+            const coverArtStream = fs.createReadStream(cover_art_path);
             coverArtStream.pipe(res, { end: false });
-
-            coverArtStream.on('end', () => {
-                res.write(metadata); // Send metadata after cover art
-            });
-
-            coverArtStream.on('error', (error) => {
-                console.error('Error streaming cover art:', error);
-            });
         }
+
+        // Move to the next MP3 file
+        currentIndex++;
+
+        // When MP3 file stream ends, play the next one
+        mp3Stream.on('end', () => {
+            playNext();
+        });
     };
 
-    // Start streaming the first MP3 file
     playNext();
 }
 
@@ -107,12 +90,12 @@ app.get('/play', (req, res) => {
     if (jsonUrl) {
         // Fetch MP3 files from JSON URL
         fetchMP3FilesJSON(jsonUrl)
-            .then(mp3Files => {
+            .then(({ mp3Files, metadata }) => {
                 if (mp3Files.length === 0) {
                     return res.status(400).send('No MP3 files available.');
                 }
-                // Stream MP3 files with metadata
-                streamMP3Files(mp3Files, res, jsonUrl);
+                // Stream MP3 files
+                streamMP3Files(mp3Files, res, jsonUrl, metadata);
             })
             .catch(error => {
                 console.error('Error fetching MP3 files:', error);
