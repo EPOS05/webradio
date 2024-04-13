@@ -44,13 +44,18 @@ function streamMP3Files(mp3Files, res) {
         }
 
         const filePath = mp3Files[currentIndex];
-        const streamFile = fs.createReadStream(filePath);
-        streamFile.on('error', (error) => {
+        const mp3Url = new URL(filePath);
+        https.get(mp3Url, (response) => {
+            response.pipe(res, { end: false });
+            response.on('end', () => {
+                currentIndex++;
+                playNext();
+            });
+        }).on('error', (error) => {
             console.error('Error streaming file:', error);
+            currentIndex++;
+            playNext();
         });
-        streamFile.on('end', playNext);
-        streamFile.pipe(res, { end: false });
-        currentIndex++;
     };
 
     playNext();
