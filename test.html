@@ -54,9 +54,9 @@
             // Create a media source buffer
             const sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
 
-            // Load and append audio segments to the media source buffer
-            for (const mp3File of mp3Files) {
-                const response = await fetch(mp3File);
+            // Function to load and append audio segment
+            async function loadAndAppendAudioSegment(index) {
+                const response = await fetch(mp3Files[index]);
                 if (response.ok) {
                     const arrayBuffer = await response.arrayBuffer();
                     sourceBuffer.appendBuffer(arrayBuffer);
@@ -65,11 +65,26 @@
                 }
             }
 
+            // Function to handle end of stream
+            function handleEndOfStream() {
+                // Loop back to the first song
+                currentIndex = 0;
+                loadAndAppendAudioSegment(currentIndex);
+            }
+
+            // Load and append the first audio segment
+            loadAndAppendAudioSegment(currentIndex);
+
             // Start playback once media source buffer is updated
             sourceBuffer.addEventListener('updateend', () => {
-                // If reached end of stream, loop back to the first song
-                currentIndex = (currentIndex + 1) % mp3Files.length;
-                audioPlayer.play();
+                // If reached end of buffer, handle end of stream
+                if (currentIndex === mp3Files.length - 1) {
+                    handleEndOfStream();
+                } else {
+                    // Load and append the next audio segment
+                    currentIndex++;
+                    loadAndAppendAudioSegment(currentIndex);
+                }
             });
         }
 
