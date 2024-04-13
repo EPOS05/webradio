@@ -33,15 +33,15 @@ function fetchMP3FilesJSON(jsonFileUrl) {
 
 // Function to stream MP3 files
 function streamMP3Files(mp3Files, res, jsonUrl) {
-    const currentIndex = { index: 0 };
+    let currentIndex = 0;
 
     const playNext = () => {
-        if (currentIndex.index >= mp3Files.length) {
-            // Loop back to the first audio file
-            currentIndex.index = 0;
+        if (currentIndex >= mp3Files.length) {
+            // Reset index if all MP3 files have been streamed
+            currentIndex = 0;
         }
 
-        const mp3Data = mp3Files[currentIndex.index];
+        const mp3Data = mp3Files[currentIndex];
         const mp3FilePath = mp3Data.file_path;
         const mp3Url = url.resolve(jsonUrl, mp3FilePath);
         const coverArtPath = mp3Data.cover_art_path;
@@ -49,6 +49,7 @@ function streamMP3Files(mp3Files, res, jsonUrl) {
         // Create ICY metadata
         const metadata = `StreamTitle='${mp3Data.title} - ${mp3Data.artist} - ${mp3Data.album} - ${mp3Data.year}';`;
 
+        // Write metadata headers to response
         res.writeHead(200, {
             'Content-Type': 'audio/mpeg',
             'icy-name': 'Your Radio Name',
@@ -62,24 +63,25 @@ function streamMP3Files(mp3Files, res, jsonUrl) {
             response.pipe(res, { end: false });
 
             response.on('end', () => {
-                currentIndex.index++;
-                playNext();
+                currentIndex++; // Move to the next MP3 file
+                playNext(); // Stream the next MP3 file
             });
         });
 
+        // Handle errors while streaming MP3 file
         mp3Stream.on('error', (error) => {
             console.error('Error streaming file:', error);
-            currentIndex.index++;
-            playNext();
+            currentIndex++; // Move to the next MP3 file
+            playNext(); // Stream the next MP3 file
         });
 
-        // Send metadata
+        // Send metadata with each chunk of data
         mp3Stream.on('data', (chunk) => {
             res.write(chunk);
             res.write(metadata); // Send metadata with each chunk
         });
 
-        // Add cover art if available
+        // Stream cover art if available
         if (coverArtPath) {
             const coverArtStream = fs.createReadStream(coverArtPath);
             coverArtStream.pipe(res, { end: false });
@@ -87,9 +89,14 @@ function streamMP3Files(mp3Files, res, jsonUrl) {
             coverArtStream.on('end', () => {
                 res.write(metadata); // Send metadata after cover art
             });
+
+            coverArtStream.on('error', (error) => {
+                console.error('Error streaming cover art:', error);
+            });
         }
     };
 
+    // Start streaming the first MP3 file
     playNext();
 }
 
