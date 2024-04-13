@@ -54,14 +54,12 @@
                 .catch(error => console.error("Error playing MP3:", mp3Url, error));
         }
 
-        // Function to play audio
+        // Function to play audio continuously like a live radio stream
         function playAudio(mp3Files) {
             const audioPlayer = document.getElementById('audioPlayer');
             let currentIndex = 0;
 
-            // Play the first audio file
-            playNext();
-
+            // Function to play the next audio file
             function playNext() {
                 // Set source of audio player to the current file
                 audioPlayer.src = mp3Files[currentIndex];
@@ -76,21 +74,19 @@
                         console.log("Playing:", mp3Files[currentIndex]);
                     })
                     .catch(error => console.error("Error playing:", mp3Files[currentIndex], error));
-
-                // Move to next audio file after current one finishes
-                audioPlayer.onended = () => {
-                    if (currentIndex < mp3Files.length - 1) {
-                        // Increment currentIndex to move to the next file
-                        currentIndex++;
-                        // Play the next audio file
-                        playNext();
-                    } else {
-                        console.log('All MP3 files played.');
-                    }
-                };
             }
-        }
 
+            // Play the first audio file
+            playNext();
+
+            // When an audio file ends, play the next one
+            audioPlayer.onended = () => {
+                // Move to the next audio file
+                currentIndex = (currentIndex + 1) % mp3Files.length;
+                // Play the next audio file
+                playNext();
+            };
+        }
 
         // Fetch MP3 files JSON or play MP3 from URL when the page loads
         const jsonFileUrl = getQueryParameter('json');
