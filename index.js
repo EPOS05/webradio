@@ -2,6 +2,7 @@ const express = require('express');
 const https = require('https');
 const { Readable } = require('stream');
 const url = require('url');
+const fs = require('fs');
 
 const app = express();
 
@@ -44,8 +45,19 @@ function streamMP3Files(mp3Files, res, jsonUrl) {
             currentIndex = 0;
         }
 
-        const mp3FilePath = mp3Files[currentIndex];
+        const mp3FilePath = mp3Files[currentIndex].file_path;
         const mp3Url = url.resolve(jsonUrl, mp3FilePath);
+
+        // Set response headers
+        res.set({
+            'Content-Type': 'audio/mpeg',
+            'Metadata-Title': mp3Files[currentIndex].title || '',
+            'Metadata-Artist': mp3Files[currentIndex].artist || '',
+            'Metadata-Album': mp3Files[currentIndex].album || '',
+            'Metadata-Year': mp3Files[currentIndex].year || '',
+            'Metadata-CoverArt': mp3Files[currentIndex].cover_art_path || ''
+        });
+
         https.get(mp3Url, (response) => {
             response.pipe(res, { end: false });
             response.on('end', () => {
