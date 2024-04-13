@@ -16,15 +16,7 @@ function fetchMP3FilesJSON(jsonFileUrl) {
             response.on('end', () => {
                 try {
                     const json = JSON.parse(data);
-                    const mp3Files = json.mp3_files.map((mp3, index) => ({
-                        id: index + 1,
-                        file_path: mp3.file_path,
-                        title: mp3.title || '',
-                        artist: mp3.artist || '',
-                        album: mp3.album || '',
-                        year: mp3.year || '',
-                        cover_art_path: mp3.cover_art_path || ''
-                    }));
+                    const mp3Files = json.mp3_files;
                     resolve(mp3Files);
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
@@ -52,18 +44,9 @@ function streamMP3Files(mp3Files, res, jsonUrl) {
             currentIndex = 0;
         }
 
-        const mp3 = mp3Files[currentIndex];
-        const mp3Url = url.resolve(jsonUrl, mp3.file_path);
+        const mp3FilePath = mp3Files[currentIndex];
+        const mp3Url = url.resolve(jsonUrl, mp3FilePath);
         https.get(mp3Url, (response) => {
-            // Add metadata to the response headers
-            res.setHeader('Content-Type', 'audio/mpeg');
-            res.setHeader('Title', mp3.title);
-            res.setHeader('Artist', mp3.artist);
-            res.setHeader('Album', mp3.album);
-            res.setHeader('Year', mp3.year);
-            if (mp3.cover_art_path) {
-                res.setHeader('Cover-Art', mp3.cover_art_path);
-            }
             response.pipe(res, { end: false });
             response.on('end', () => {
                 currentIndex++;
