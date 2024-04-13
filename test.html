@@ -7,7 +7,7 @@
 </head>
 <body>
     <!-- Hidden audio element for playback -->
-    <audio id="audioPlayer" style="display: block;" controls autoplay></audio>
+    <audio id="audioPlayer" style="display: block;" controls></audio>
 
     <script>
         // Function to parse query parameters from URL
@@ -24,8 +24,10 @@
                     const json = await response.json();
                     const mp3Files = json.mp3_files;
                     if (mp3Files.length > 0) {
+                        // Fetch and concatenate MP3 files into one continuous stream
+                        const mp3Stream = await concatenateMP3Files(mp3Files);
                         // Start playing audio
-                        playLiveAudio(mp3Files);
+                        playAudio(mp3Stream);
                     } else {
                         console.log('No MP3 files available in JSON.');
                     }
@@ -37,65 +39,43 @@
             }
         }
 
-        // Function to play live audio stream
-        async function playLiveAudio(mp3Files) {
+        // Function to concatenate MP3 files into one continuous stream
+        async function concatenateMP3Files(mp3Files) {
+            let mp3Stream = new Blob();
+            for (const mp3File of mp3Files) {
+                const response = await fetch(mp3File);
+                const mp3Blob = await response.blob();
+                mp3Stream = new Blob([mp3Stream, mp3Blob], { type: 'audio/mp3' });
+            }
+            return URL.createObjectURL(mp3Stream);
+        }
+
+        // Function to play audio continuously like a live radio stream
+        function playAudio(mp3StreamUrl) {
             const audioPlayer = document.getElementById('audioPlayer');
-            let currentIndex = 0;
-
-            // Create a media source object
-            const mediaSource = new MediaSource();
-            audioPlayer.src = URL.createObjectURL(mediaSource);
-
-            // Wait for media source to open
-            await new Promise(resolve => {
-                mediaSource.addEventListener('sourceopen', resolve);
-            });
-
-            // Create a media source buffer
-            const sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
-
-            // Function to load and append audio segment
-            async function loadAndAppendAudioSegment(index) {
-                const response = await fetch(mp3Files[index]);
-                if (response.ok) {
-                    const arrayBuffer = await response.arrayBuffer();
-                    sourceBuffer.appendBuffer(arrayBuffer);
-                } else {
-                    console.error("Fetch Error:", response.statusText);
-                }
-            }
-
-            // Function to handle end of stream
-            function handleEndOfStream() {
-                // Loop back to the first song
-                currentIndex = 0;
-                loadAndAppendAudioSegment(currentIndex);
-            }
-
-            // Load and append the first audio segment
-            loadAndAppendAudioSegment(currentIndex);
-
-            // Start playback once media source buffer is updated
-            sourceBuffer.addEventListener('updateend', () => {
-                // If reached end of buffer, handle end of stream
-                if (currentIndex === mp3Files.length - 1) {
-                    handleEndOfStream();
-                } else {
-                    // Load and append the next audio segment
-                    currentIndex++;
-                    loadAndAppendAudioSegment(currentIndex);
-                }
-            });
+            // Set source of audio player to the continuous stream
+            audioPlayer.src = mp3StreamUrl;
+            console.log("Loading:", mp3StreamUrl);
+            // Autoplay audio
+            audioPlayer.autoplay = true;
+            // Loop the audio stream
+            audioPlayer.loop = true;
+            // Play audio
+            audioPlayer.play()
+                .then(() => {
+                    console.log("Playing:", mp3StreamUrl);
+                })
+                .catch(error => console.error("Error playing:", mp3StreamUrl, error));
         }
 
         // Fetch MP3 files JSON or play MP3 from URL when the page loads
         const jsonFileUrl = getQueryParameter('json');
         const mp3Url = getQueryParameter('mp3');
         if (mp3Url) {
-            // Play a single MP3 file
-            document.getElementById('audioPlayer').src = mp3Url;
+            // Start playing audio from MP3 URL
+            playAudio(mp3Url);
         } else if (jsonFileUrl) {
-            // Fetch MP3 files from JSON URL and play as live stream
+            // Fetch MP3 files from JSON URL and start playing
             fetchMP3FilesJSON(jsonFileUrl);
         } else {
             console.error('MP3 URL or JSON file URL not provided.');
