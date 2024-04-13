@@ -33,42 +33,61 @@ function fetchMP3FilesJSON(jsonFileUrl) {
 
 // Function to stream MP3 files
 function streamMP3Files(mp3Files, res, jsonUrl) {
-    const stream = new Readable({
-        read() {}
-    });
-
-    let currentIndex = 0;
+    const currentIndex = { index: 0 };
 
     const playNext = () => {
-        if (currentIndex >= mp3Files.length) {
+        if (currentIndex.index >= mp3Files.length) {
             // Loop back to the first audio file
-            currentIndex = 0;
+            currentIndex.index = 0;
         }
 
-        const mp3FilePath = mp3Files[currentIndex].file_path;
+        const mp3Data = mp3Files[currentIndex.index];
+        const mp3FilePath = mp3Data.file_path;
         const mp3Url = url.resolve(jsonUrl, mp3FilePath);
+        const coverArtPath = mp3Data.cover_art_path;
 
-        // Set response headers
-        res.set({
+        // Create ICY metadata
+        const metadata = `StreamTitle='${mp3Data.title} - ${mp3Data.artist} - ${mp3Data.album} - ${mp3Data.year}';`;
+
+        res.writeHead(200, {
             'Content-Type': 'audio/mpeg',
-            'Metadata-Title': mp3Files[currentIndex].title || '',
-            'Metadata-Artist': mp3Files[currentIndex].artist || '',
-            'Metadata-Album': mp3Files[currentIndex].album || '',
-            'Metadata-Year': mp3Files[currentIndex].year || '',
-            'Metadata-CoverArt': mp3Files[currentIndex].cover_art_path || ''
+            'icy-name': 'Your Radio Name',
+            'icy-genre': 'Your Radio Genre',
+            'icy-metadata': '1', // Enable ICY metadata
+            'icy-metaint': '16000', // Send metadata every 16KB
         });
 
-        https.get(mp3Url, (response) => {
+        // Stream MP3 file
+        const mp3Stream = https.get(mp3Url, (response) => {
             response.pipe(res, { end: false });
+
             response.on('end', () => {
-                currentIndex++;
+                currentIndex.index++;
                 playNext();
             });
-        }).on('error', (error) => {
+        });
+
+        mp3Stream.on('error', (error) => {
             console.error('Error streaming file:', error);
-            currentIndex++;
+            currentIndex.index++;
             playNext();
         });
+
+        // Send metadata
+        mp3Stream.on('data', (chunk) => {
+            res.write(chunk);
+            res.write(metadata); // Send metadata with each chunk
+        });
+
+        // Add cover art if available
+        if (coverArtPath) {
+            const coverArtStream = fs.createReadStream(coverArtPath);
+            coverArtStream.pipe(res, { end: false });
+
+            coverArtStream.on('end', () => {
+                res.write(metadata); // Send metadata after cover art
+            });
+        }
     };
 
     playNext();
@@ -85,7 +104,7 @@ app.get('/play', (req, res) => {
                 if (mp3Files.length === 0) {
                     return res.status(400).send('No MP3 files available.');
                 }
-                // Stream MP3 files
+                // Stream MP3 files with metadata
                 streamMP3Files(mp3Files, res, jsonUrl);
             })
             .catch(error => {
