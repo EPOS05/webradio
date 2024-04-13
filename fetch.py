@@ -20,12 +20,15 @@ mp3_files = [folder_path + file for file in files if file.lower().endswith('.mp3
 # Create a list to store dictionaries for each MP3 file
 mp3_list = []
 
+# Counter for generating IDs
+id_counter = 1
+
 # Iterate over each MP3 file
 for mp3_file in mp3_files:
     # Open the MP3 file and extract metadata
     audio = MP3(mp3_file, ID3=ID3)
 
-    # Extract basic metadata
+    # Extract basic metadata using ID3 tags
     title = audio.get('TIT2', [''])[0]
     artist = audio.get('TPE1', [''])[0]
     album = audio.get('TALB', [''])[0]
@@ -37,13 +40,14 @@ for mp3_file in mp3_files:
         if isinstance(tag, APIC):
             cover_art = tag.data
             # Save cover art to the 'img' folder
-            cover_art_path = os.path.join(img_folder_path, os.path.splitext(os.path.basename(mp3_file))[0] + '.jpg')
+            cover_art_path = os.path.join(img_folder_path, str(id_counter) + '.jpg')
             with open(cover_art_path, 'wb') as img_file:
                 img_file.write(cover_art)
             break  # Stop after extracting the first cover art
 
     # Create dictionary with metadata and cover art path
     mp3_data = {
+        'id': id_counter,
         'file_path': mp3_file,
         'title': title,
         'artist': artist,
@@ -54,6 +58,9 @@ for mp3_file in mp3_files:
 
     # Add dictionary to the list
     mp3_list.append(mp3_data)
+
+    # Increment ID counter
+    id_counter += 1
 
 # Write the list to a JSON file
 with open('mp3_files.json', 'w') as json_file:
