@@ -1,17 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Streaming Site</title>
 </head>
-
 <body>
-    <h1>Streaming Site</h1>
-
     <!-- Hidden audio element for playback -->
-    <audio id="audioPlayer" style="display: none;"></audio>
+    <audio id="audioPlayer" style="display: block;" controls></audio>
 
     <script>
         // Function to parse query parameters from URL
@@ -39,19 +35,6 @@
             } catch (error) {
                 console.error('Error fetching MP3 files JSON:', error);
             }
-        }
-
-        // Function to play audio directly from MP3 URL
-        function playAudioFromUrl(mp3Url) {
-            const audioPlayer = document.getElementById('audioPlayer');
-            audioPlayer.src = mp3Url;
-            console.log("Loading MP3:", mp3Url);
-            audioPlayer.autoplay = true;
-            audioPlayer.play()
-                .then(() => {
-                    console.log("Playing MP3:", mp3Url);
-                })
-                .catch(error => console.error("Error playing MP3:", mp3Url, error));
         }
 
         // Function to play audio continuously like a live radio stream
@@ -92,13 +75,14 @@
         const jsonFileUrl = getQueryParameter('json');
         const mp3Url = getQueryParameter('mp3');
         if (mp3Url) {
-            playAudioFromUrl(mp3Url);
+            // Start playing audio from MP3 URL
+            playAudio([mp3Url]);
         } else if (jsonFileUrl) {
+            // Fetch MP3 files from JSON URL and start playing
             fetchMP3FilesJSON(jsonFileUrl);
         } else {
             console.error('MP3 URL or JSON file URL not provided.');
         }
     </script>
 </body>
-
 </html>
