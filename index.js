@@ -1,6 +1,7 @@
 const express = require('express');
 const https = require('https');
 const { Readable } = require('stream');
+const url = require('url');
 
 const app = express();
 
@@ -43,8 +44,8 @@ function streamMP3Files(mp3Files, res) {
             currentIndex = 0;
         }
 
-        const filePath = encodeURI(mp3Files[currentIndex]);
-        const mp3Url = new URL(filePath);
+        const mp3FilePath = mp3Files[currentIndex];
+        const mp3Url = url.resolve(jsonUrl, mp3FilePath);
         https.get(mp3Url, (response) => {
             response.pipe(res, { end: false });
             response.on('end', () => {
