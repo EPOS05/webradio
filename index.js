@@ -1,6 +1,6 @@
 const express = require('express');
 const fs = require('fs');
-const http = require('http');
+const https = require('https');
 const { Readable } = require('stream');
 
 const app = express();
@@ -8,7 +8,7 @@ const app = express();
 // Function to fetch MP3 files JSON
 function fetchMP3FilesJSON(jsonFileUrl) {
     return new Promise((resolve, reject) => {
-        http.get(jsonFileUrl, (response) => {
+        https.get(jsonFileUrl, (response) => {
             let data = '';
             response.on('data', chunk => {
                 data += chunk;
@@ -69,7 +69,7 @@ app.get('/play', (req, res) => {
             'Connection': 'keep-alive',
             'Transfer-Encoding': 'chunked'
         });
-        http.get(mp3Url, (response) => {
+        https.get(mp3Url, (response) => {
             response.pipe(res);
         }).on('error', (error) => {
             console.error('Error fetching MP3:', error);
