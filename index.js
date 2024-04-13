@@ -33,10 +33,6 @@ function fetchMP3FilesJSON(jsonFileUrl) {
 
 // Function to stream MP3 files
 function streamMP3Files(mp3Files, res, jsonUrl, metadata) {
-    const stream = new Readable({
-        read() {}
-    });
-
     let currentIndex = 0;
 
     const playNext = () => {
@@ -55,11 +51,12 @@ function streamMP3Files(mp3Files, res, jsonUrl, metadata) {
         // Create ICY metadata
         const icyMetadata = `StreamTitle='${title} - ${artist} - ${album} - ${year}';`;
 
-        // Pipe ICY metadata to the response
-        res.write('HTTP/1.1 200 OK\r\n');
-        res.write('Content-Type: audio/mpeg\r\n');
-        res.write(`icy-metaint: ${icyMetadata.length}\r\n`);
-        res.write('\r\n');
+        // Set response headers
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('icy-metaint', icyMetadata.length);
+
+        // Write ICY metadata to response
+        res.write(icyMetadata);
 
         // Stream MP3 file
         const mp3Stream = fs.createReadStream(mp3FilePath);
