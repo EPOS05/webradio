@@ -39,7 +39,7 @@ function fetchMP3FilesJSON(jsonFileUrl) {
 }
 
 // Function to stream MP3 files
-function streamMP3Files(mp3Files, res) {
+function streamMP3Files(mp3Files, res, jsonUrl) {
     const stream = new Readable({
         read() {}
     });
@@ -91,7 +91,7 @@ app.get('/play', (req, res) => {
                     return res.status(400).send('No MP3 files available.');
                 }
                 // Stream MP3 files
-                streamMP3Files(mp3Files, res);
+                streamMP3Files(mp3Files, res, jsonUrl);
             })
             .catch(error => {
                 console.error('Error fetching MP3 files:', error);
