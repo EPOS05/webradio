@@ -90,6 +90,7 @@ app.get('/play', (req, res) => {
                     streamMP3Files(mp3Files, res);
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
+                    console.log('JSON Response:', data);
                     res.status(500).send('Internal Server Error');
                 }
             });
