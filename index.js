@@ -37,6 +37,7 @@ function streamMP3Files(mp3Files, res) {
             response.pipe(res, { end: false });
             response.on('end', () => {
                 currentIndex++;
+                pingServer(); // Automatically ping the server after each song finishes
                 playNext();
             });
         }).on('error', (error) => {
@@ -59,7 +60,7 @@ function streamMP3Files(mp3Files, res) {
 
 // Function to ping the server
 function pingServer() {
-    console.log('Pinging server to indicate activity.');
+    console.log('Server pinged to indicate activity.'); // Log the ping
 }
 
 // Route to play MP3 files
@@ -123,12 +124,6 @@ app.get('/play', (req, res) => {
     } else {
         res.status(400).send('Neither MP3 URL nor JSON URL provided.');
     }
-});
-
-// Route to handle ping requests
-app.get('/ping', (req, res) => {
-    pingServer(); // Ping the server to indicate activity
-    res.sendStatus(200);
 });
 
 const PORT = process.env.PORT || 3000;
