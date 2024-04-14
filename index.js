@@ -54,9 +54,25 @@ function streamMP3Files(mp3Files, res) {
 
 // Route to play MP3 files
 app.get('/play', (req, res) => {
+    const mp3Url = req.query.mp3;
     const jsonUrl = req.query.json;
-
-    if (jsonUrl) {
+    const bufferLength = parseInt(req.query.bufferLength) || 3; // Default buffer length is 3
+    
+    if (mp3Url) {
+        // Stream MP3 file directly
+        res.status(200).set({
+            'Content-Type': 'audio/mpeg',
+            'Connection': 'keep-alive',
+            'Transfer-Encoding': 'chunked'
+        });
+        const protocol = mp3Url.startsWith('https://') ? https : http;
+        protocol.get(mp3Url, (response) => {
+            response.pipe(res);
+        }).on('error', (error) => {
+            console.error('Error fetching MP3:', error);
+            res.status(500).send('Internal Server Error');
+        });
+    } else if (jsonUrl) {
         // Fetch MP3 files from JSON URL
         const protocol = jsonUrl.startsWith('https://') ? https : http;
         protocol.get(jsonUrl, (response) => {
@@ -75,10 +91,11 @@ app.get('/play', (req, res) => {
                     const randomIndex = Math.floor(Math.random() * mp3Files.length);
                     const randomFilePath = mp3Files[randomIndex];
                     streamMP3Files([randomFilePath], res);
-
-                    // Start loading and shuffling the rest asynchronously
-                    const remainingFiles = [...mp3Files.slice(0, randomIndex), ...mp3Files.slice(randomIndex + 1)];
-                    shuffleArray(remainingFiles);
+                    
+                    // Shuffle and stream the rest of the files asynchronously
+                    const remainingFiles = mp3Files.filter((_, index) => index !== randomIndex);
+                    shuffleArray(remainingFiles.slice(0, bufferLength));
+                    streamMP3Files(remainingFiles.slice(bufferLength), res);
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
                     res.status(500).send('Internal Server Error');
@@ -89,7 +106,7 @@ app.get('/play', (req, res) => {
             res.status(500).send('Internal Server Error');
         });
     } else {
-        res.status(400).send('JSON URL not provided.');
+        res.status(400).send('Neither MP3 URL nor JSON URL provided.');
     }
 });
 
