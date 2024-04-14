@@ -43,8 +43,8 @@ function streamMP3Files(mp3Files, res) {
             console.error('Error streaming file:', error);
         });
 
-        // Close the request if the client aborts the connection
-        res.on('close', () => {
+        // Remove the close event listener once it's triggered
+        res.once('close', () => {
             request.abort();
         });
     };
