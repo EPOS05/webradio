@@ -40,7 +40,11 @@ function streamMP3Files(mp3Files, res) {
                 playNext();
             });
         }).on('error', (error) => {
-            console.error('Error streaming file:', error);
+            if (error.code === 'ECONNRESET') {
+                console.error('Socket hang up:', error.message);
+            } else {
+                console.error('Error streaming file:', error);
+            }
         });
 
         // Remove the close event listener once it's triggered
