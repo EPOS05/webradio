@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const https = require('https');
-const fs = require('fs');
 const { Readable } = require('stream');
 
 const app = express();
@@ -19,10 +18,6 @@ function shuffleArray(array) {
 function streamMP3Files(mp3Files, res) {
     const shuffledFiles = shuffleArray([...mp3Files]); // Shuffle the array of files
 
-    const stream = new Readable({
-        read() {}
-    });
-
     let currentIndex = 0;
 
     const playNext = () => {
@@ -38,7 +33,7 @@ function streamMP3Files(mp3Files, res) {
         const protocol = filePath.startsWith('https://') ? https : http;
 
         // If the file path is a URL, stream it directly
-        protocol.get(filePath, (response) => {
+        const request = protocol.get(filePath, (response) => {
             response.pipe(res, { end: false });
             response.on('end', () => {
                 currentIndex++;
@@ -46,10 +41,25 @@ function streamMP3Files(mp3Files, res) {
             });
         }).on('error', (error) => {
             console.error('Error streaming file:', error);
+            res.end(); // End the response stream on error
         });
+
+        // Remove event listener when response stream ends or on error
+        const onClose = () => {
+            res.removeListener('close', onClose);
+            request.abort();
+        };
+
+        res.on('close', onClose);
+        request.on('close', onClose);
     };
 
     playNext();
+}
+
+// Function to ping the server
+function pingServer() {
+    console.log('Pinging server to indicate activity.');
 }
 
 // Route to play MP3 files
@@ -75,6 +85,18 @@ app.get('/play', (req, res) => {
         // Fetch MP3 files from JSON URL
         const protocol = jsonUrl.startsWith('https://') ? https : http;
         protocol.get(jsonUrl, (response) => {
+            if (response.statusCode !== 200) {
+                console.error('Error fetching JSON:', response.statusCode);
+                res.status(response.statusCode).send('Error fetching JSON');
+                return;
+            }
+
+            res.status(200).set({
+                'Content-Type': 'audio/mpeg',
+                'Connection': 'keep-alive',
+                'Transfer-Encoding': 'chunked'
+            });
+
             let data = '';
             response.on('data', chunk => {
                 data += chunk;
@@ -84,13 +106,13 @@ app.get('/play', (req, res) => {
                     const json = JSON.parse(data);
                     const mp3Files = json.mp3_files;
                     if (!mp3Files || !Array.isArray(mp3Files) || mp3Files.length === 0) {
-                        return res.status(400).send('Invalid JSON format or no MP3 files available.');
+                        res.status(400).send('Invalid JSON format or no MP3 files available.');
+                        return;
                     }
                     // Stream MP3 files
                     streamMP3Files(mp3Files, res);
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
-                    console.log('JSON Response:', data);
                     res.status(500).send('Internal Server Error');
                 }
             });
@@ -101,6 +123,12 @@ app.get('/play', (req, res) => {
     } else {
         res.status(400).send('Neither MP3 URL nor JSON URL provided.');
     }
+});
+
+// Route to handle ping requests
+app.get('/ping', (req, res) => {
+    pingServer(); // Ping the server to indicate activity
+    res.sendStatus(200);
 });
 
 const PORT = process.env.PORT || 3000;
