@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
 const { Readable } = require('stream');
 
 const app = express();
@@ -16,15 +17,23 @@ function shuffleArray(array) {
 
 // Function to stream MP3 files
 function streamMP3Files(mp3Files, res) {
-    shuffleArray(mp3Files); // Shuffle the array of files
+    const shuffledFiles = shuffleArray([...mp3Files]); // Shuffle the array of files
 
-    const playNext = (index) => {
-        if (index >= mp3Files.length) {
-            return; // Finished streaming all files
+    const stream = new Readable({
+        read() {}
+    });
+
+    let currentIndex = 0;
+
+    const playNext = () => {
+        if (currentIndex >= shuffledFiles.length) {
+            // Loop back to the beginning of the shuffled list
+            currentIndex = 0;
+            shuffleArray(shuffledFiles); // Reshuffle the list for next iteration
         }
 
-        const filePath = mp3Files[index];
-
+        const filePath = shuffledFiles[currentIndex];
+        
         // Determine the protocol (HTTP or HTTPS) and use the appropriate module
         const protocol = filePath.startsWith('https://') ? https : http;
 
@@ -32,37 +41,22 @@ function streamMP3Files(mp3Files, res) {
         protocol.get(filePath, (response) => {
             response.pipe(res, { end: false });
             response.on('end', () => {
-                playNext(index + 1); // Stream the next file
+                currentIndex++;
+                playNext();
             });
         }).on('error', (error) => {
             console.error('Error streaming file:', error);
-            playNext(index + 1); // Move to the next file even if there's an error
         });
     };
 
-    playNext(0); // Start streaming from the first file
+    playNext();
 }
 
 // Route to play MP3 files
 app.get('/play', (req, res) => {
-    const mp3Url = req.query.mp3;
     const jsonUrl = req.query.json;
 
-    if (mp3Url) {
-        // Stream MP3 file directly
-        res.status(200).set({
-            'Content-Type': 'audio/mpeg',
-            'Connection': 'keep-alive',
-            'Transfer-Encoding': 'chunked'
-        });
-        const protocol = mp3Url.startsWith('https://') ? https : http;
-        protocol.get(mp3Url, (response) => {
-            response.pipe(res);
-        }).on('error', (error) => {
-            console.error('Error fetching MP3:', error);
-            res.status(500).send('Internal Server Error');
-        });
-    } else if (jsonUrl) {
+    if (jsonUrl) {
         // Fetch MP3 files from JSON URL
         const protocol = jsonUrl.startsWith('https://') ? https : http;
         protocol.get(jsonUrl, (response) => {
@@ -77,8 +71,14 @@ app.get('/play', (req, res) => {
                     if (!mp3Files || !Array.isArray(mp3Files) || mp3Files.length === 0) {
                         return res.status(400).send('Invalid JSON format or no MP3 files available.');
                     }
-                    // Stream MP3 files
-                    streamMP3Files(mp3Files, res);
+                    // Stream random MP3 immediately
+                    const randomIndex = Math.floor(Math.random() * mp3Files.length);
+                    const randomFilePath = mp3Files[randomIndex];
+                    streamMP3Files([randomFilePath], res);
+
+                    // Start loading and shuffling the rest asynchronously
+                    const remainingFiles = [...mp3Files.slice(0, randomIndex), ...mp3Files.slice(randomIndex + 1)];
+                    shuffleArray(remainingFiles);
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
                     res.status(500).send('Internal Server Error');
@@ -89,7 +89,7 @@ app.get('/play', (req, res) => {
             res.status(500).send('Internal Server Error');
         });
     } else {
-        res.status(400).send('Neither MP3 URL nor JSON URL provided.');
+        res.status(400).send('JSON URL not provided.');
     }
 });
 
