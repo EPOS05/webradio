@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const https = require('https');
-const { Readable } = require('stream');
 
 const app = express();
 
@@ -14,75 +13,34 @@ function shuffleArray(array) {
     return array;
 }
 
-// Function to stream MP3 files
-function streamMP3Files(mp3Files, res) {
-    const shuffledFiles = shuffleArray([...mp3Files]); // Shuffle the array of files
-
-    let currentIndex = 0;
-
-    const playNext = () => {
-        if (currentIndex >= shuffledFiles.length) {
-            // Loop back to the beginning of the shuffled list
-            currentIndex = 0;
-            shuffleArray(shuffledFiles); // Reshuffle the list for next iteration
-        }
-
-        const filePath = shuffledFiles[currentIndex];
-        
-        // Determine the protocol (HTTP or HTTPS) and use the appropriate module
-        const protocol = filePath.startsWith('https://') ? https : http;
-
-        // If the file path is a URL, stream it directly
-        const request = protocol.get(filePath, (response) => {
-            response.pipe(res, { end: false });
-            response.on('end', () => {
-                currentIndex++;
-                playNext();
-            });
-        }).on('error', (error) => {
-            console.error('Error streaming file:', error);
-            res.end(); // End the response stream on error
+// Function to stream MP3 file
+function streamMP3File(url, res, callback) {
+    const protocol = url.startsWith('https://') ? https : http;
+    const request = protocol.get(url, (response) => {
+        response.pipe(res, { end: false });
+        response.on('end', () => {
+            callback();
         });
+    }).on('error', (error) => {
+        console.error('Error streaming file:', error);
+        res.end(); // End the response stream on error
+    });
 
-        // Increase timeout for the request
-        request.setTimeout(60000, () => {
-            console.error('Request timeout');
-            request.abort();
-        });
-
-        // Remove event listener when response stream ends or on error
-        const onClose = () => {
-            res.removeListener('close', onClose);
-            request.abort();
-        };
-
-        res.on('close', onClose);
-        request.on('close', onClose);
+    // Remove event listener when response stream ends or on error
+    const onClose = () => {
+        res.removeListener('close', onClose);
+        request.abort();
     };
 
-    playNext();
+    res.on('close', onClose);
+    request.on('close', onClose);
 }
 
 // Route to play MP3 files
 app.get('/play', (req, res) => {
-    const mp3Url = req.query.mp3;
     const jsonUrl = req.query.json;
 
-    if (mp3Url) {
-        // Stream MP3 file directly
-        res.status(200).set({
-            'Content-Type': 'audio/mpeg',
-            'Connection': 'keep-alive',
-            'Transfer-Encoding': 'chunked'
-        });
-        const protocol = mp3Url.startsWith('https://') ? https : http;
-        protocol.get(mp3Url, (response) => {
-            response.pipe(res);
-        }).on('error', (error) => {
-            console.error('Error fetching MP3:', error);
-            res.status(500).send('Internal Server Error');
-        });
-    } else if (jsonUrl) {
+    if (jsonUrl) {
         // Fetch MP3 files from JSON URL
         const protocol = jsonUrl.startsWith('https://') ? https : http;
         protocol.get(jsonUrl, (response) => {
@@ -91,12 +49,6 @@ app.get('/play', (req, res) => {
                 res.status(response.statusCode).send('Error fetching JSON');
                 return;
             }
-
-            res.status(200).set({
-                'Content-Type': 'audio/mpeg',
-                'Connection': 'keep-alive',
-                'Transfer-Encoding': 'chunked'
-            });
 
             let data = '';
             response.on('data', chunk => {
@@ -110,8 +62,26 @@ app.get('/play', (req, res) => {
                         res.status(400).send('Invalid JSON format or no MP3 files available.');
                         return;
                     }
-                    // Stream MP3 files
-                    streamMP3Files(mp3Files, res);
+                    // Start streaming the first song in the list
+                    res.status(200).set({
+                        'Content-Type': 'audio/mpeg',
+                        'Connection': 'keep-alive',
+                        'Transfer-Encoding': 'chunked'
+                    });
+                    streamMP3File(mp3Files[0], res, () => {
+                        // After the first song finishes, shuffle the remaining songs in the list and start streaming from the shuffled list
+                        const shuffledFiles = shuffleArray(mp3Files.slice(1)); // Exclude the first song
+                        shuffledFiles.forEach((url, index) => {
+                            setTimeout(() => {
+                                streamMP3File(url, res, () => {
+                                    if (index === shuffledFiles.length - 1) {
+                                        // End response stream after playing the last song in the shuffled list
+                                        res.end();
+                                    }
+                                });
+                            }, index * 1000); // Delay each song by 1 second to avoid simultaneous streaming
+                        });
+                    });
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
                     res.status(500).send('Internal Server Error');
@@ -122,7 +92,7 @@ app.get('/play', (req, res) => {
             res.status(500).send('Internal Server Error');
         });
     } else {
-        res.status(400).send('Neither MP3 URL nor JSON URL provided.');
+        res.status(400).send('No JSON URL provided.');
     }
 });
 
