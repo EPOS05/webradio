@@ -44,6 +44,12 @@ function streamMP3Files(mp3Files, res) {
             res.end(); // End the response stream on error
         });
 
+        // Increase timeout for the request
+        request.setTimeout(60000, () => {
+            console.error('Request timeout');
+            request.abort();
+        });
+
         // Remove event listener when response stream ends or on error
         const onClose = () => {
             res.removeListener('close', onClose);
