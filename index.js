@@ -34,21 +34,23 @@ function streamMP3Files(mp3Files, res) {
 
         // If the file path is a URL, stream it directly
         const request = protocol.get(filePath, (response) => {
+            res.writeHead(200, {
+                'Content-Type': 'audio/mpeg',
+                'Connection': 'keep-alive',
+                'Transfer-Encoding': 'chunked'
+            });
             response.pipe(res, { end: false });
             response.on('end', () => {
                 currentIndex++;
                 playNext();
             });
         }).on('error', (error) => {
-            if (error.code === 'ECONNRESET') {
-                console.error('Socket hang up:', error.message);
-            } else {
-                console.error('Error streaming file:', error);
-            }
+            console.error('Error streaming file:', error);
+            res.status(500).send('Internal Server Error');
         });
 
-        // Remove the close event listener once it's triggered
-        res.once('close', () => {
+        // Close the request if the client aborts the connection
+        res.on('close', () => {
             request.abort();
         });
     };
@@ -63,13 +65,13 @@ app.get('/play', (req, res) => {
 
     if (mp3Url) {
         // Stream MP3 file directly
-        res.status(200).set({
-            'Content-Type': 'audio/mpeg',
-            'Connection': 'keep-alive',
-            'Transfer-Encoding': 'chunked'
-        });
         const protocol = mp3Url.startsWith('https://') ? https : http;
         protocol.get(mp3Url, (response) => {
+            res.writeHead(200, {
+                'Content-Type': 'audio/mpeg',
+                'Connection': 'keep-alive',
+                'Transfer-Encoding': 'chunked'
+            });
             response.pipe(res);
         }).on('error', (error) => {
             console.error('Error fetching MP3:', error);
@@ -84,12 +86,6 @@ app.get('/play', (req, res) => {
                 res.status(response.statusCode).send('Error fetching JSON');
                 return;
             }
-
-            res.status(200).set({
-                'Content-Type': 'audio/mpeg',
-                'Connection': 'keep-alive',
-                'Transfer-Encoding': 'chunked'
-            });
 
             let data = '';
             response.on('data', chunk => {
