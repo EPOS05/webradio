@@ -13,5 +13,5 @@ https://webradio.onrender.com/play?json=[json url]
 Example:
 
 ```
-https://webradio.onrender.com/play?json=https://epos05.github.io/webradio/mp3_files.json
+https://webradio.onrender.com/play?json=https://epos05.github.io/webradio/tools/mp3_files.json
 ```
