@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const https = require('https');
 const { Readable } = require('stream');
+const axios = require('axios');
 
 const app = express();
 
@@ -55,13 +56,6 @@ function streamMP3Files(mp3Files, res) {
 
         res.on('close', onClose);
         request.on('close', onClose);
-
-        // Ping the server every 5 minutes
-        clearInterval(intervalID);
-        intervalID = setInterval(() => {
-            res.write('\n'); // Send a newline character as a ping
-            console.log('Server pinged to show activity.'); // Log the ping
-        }, 5 * 60 * 1000); // 5 minutes in milliseconds
     };
 
     playNext();
@@ -129,6 +123,27 @@ app.get('/play', (req, res) => {
         res.status(400).send('Neither MP3 URL nor JSON URL provided.');
     }
 });
+
+// Ping endpoint
+app.get('/ping', (req, res) => {
+    res.status(200).send('Ping received');
+});
+
+// Function to ping the server every 5 minutes
+const pingServer = () => {
+    setInterval(() => {
+        axios.get('https://webradio.onrender.com/ping')
+            .then(response => {
+                console.log('Server pinged to show activity.');
+            })
+            .catch(error => {
+                console.error('Error pinging server:', error.message);
+            });
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+};
+
+// Start pinging the server
+pingServer();
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
