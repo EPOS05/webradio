@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const https = require('https');
-const { Readable } = require('stream');
 
 const app = express();
 
@@ -19,6 +18,7 @@ function streamMP3Files(mp3Files, res) {
     const shuffledFiles = shuffleArray([...mp3Files]); // Shuffle the array of files
 
     let currentIndex = 0;
+    let audioStarted = false;
 
     const playNext = () => {
         if (currentIndex >= shuffledFiles.length) {
@@ -34,6 +34,15 @@ function streamMP3Files(mp3Files, res) {
 
         // If the file path is a URL, stream it directly
         const request = protocol.get(filePath, (response) => {
+            if (!audioStarted) {
+                // Set content headers only for the first successful response
+                res.status(200).set({
+                    'Content-Type': 'audio/mpeg',
+                    'Connection': 'keep-alive',
+                    'Transfer-Encoding': 'chunked'
+                });
+                audioStarted = true;
+            }
             response.pipe(res, { end: false });
             response.on('end', () => {
                 currentIndex++;
@@ -69,7 +78,7 @@ function streamJSONData(jsonUrl, callback) {
         let data = '';
         response.on('data', chunk => {
             data += chunk;
-            if (!callback.startedStreaming && data.length > 1024 * 1024) { // Start streaming MP3 files when first chunk is received (1MB)
+            if (!callback.startedStreaming && data.length > 300) { // Start streaming MP3 files when first chunk is received (300 bytes)
                 callback.startedStreaming = true;
                 response.pause(); // Pause further data events
                 try {
@@ -88,7 +97,7 @@ function streamJSONData(jsonUrl, callback) {
         });
         response.on('end', () => {
             if (!callback.startedStreaming) {
-                // JSON data received is smaller than 1MB, start streaming MP3 files now
+                // JSON data received is smaller than 300 bytes, start streaming MP3 files now
                 try {
                     const json = JSON.parse(data);
                     const mp3Files = json.mp3_files;
@@ -129,14 +138,21 @@ app.get('/play', (req, res) => {
             res.status(500).send('Internal Server Error');
         });
     } else if (jsonUrl) {
-        // Fetch MP3 files from JSON URL and start streaming
+        // Fetch MP3 files from JSON URL and start streaming after timeout
+        let timeoutReached = false;
+        setTimeout(() => {
+            timeoutReached = true;
+        }, 5000); // Timeout after 5 seconds
+
         streamJSONData(jsonUrl, (error, mp3Files) => {
             if (error) {
                 return res.status(500).send('Internal Server Error');
             }
 
-            // Stream MP3 files
-            streamMP3Files(mp3Files, res);
+            // If timeout is reached, start streaming MP3 files
+            if (timeoutReached || !mp3Files) {
+                return streamMP3Files(mp3Files || [], res);
+            }
         });
     } else {
         res.status(400).send('Neither MP3 URL nor JSON URL provided.');
