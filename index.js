@@ -14,68 +14,42 @@ function shuffleArray(array) {
     return array;
 }
 
-// ConcatStream class to concatenate multiple streams
-class ConcatStream extends Readable {
-    constructor(options) {
-        super(options);
-        this.currentStream = null;
-        this.streams = [];
-        this.currentIndex = 0;
-        this.pushedEOF = false;
+// Function to stream MP3 files
+function streamMP3Files(mp3Files, res) {
+    const shuffledFiles = shuffleArray([...mp3Files]); // Shuffle the array of files
 
-        this.on('end', () => {
-            this.emit('close');
-        });
-    }
+    let currentIndex = 0;
 
-    _read(size) {
-        if (this.currentStream === null && this.currentIndex < this.streams.length) {
-            this.currentStream = this.streams[this.currentIndex++];
-            this.currentStream.on('data', (chunk) => {
-                if (!this.push(chunk)) {
-                    this.currentStream.pause();
-                }
-            });
-            this.currentStream.on('end', () => {
-                this.currentStream = null;
-                this._read(size);
-            });
-            this.currentStream.on('error', (error) => {
-                this.emit('error', error);
-            });
-        } else if (this.currentStream === null && !this.pushedEOF) {
-            this.push(null);
-            this.pushedEOF = true;
-        } else if (this.currentStream) {
-            this.currentStream.resume();
+    const playNext = () => {
+        if (currentIndex >= shuffledFiles.length) {
+            // Loop back to the beginning of the shuffled list
+            currentIndex = 0;
+            shuffleArray(shuffledFiles); // Reshuffle the list for next iteration
         }
-    }
 
-    addStream(stream) {
-        this.streams.push(stream);
-    }
-
-    _destroy(err, callback) {
-        this.streams.forEach(stream => stream.destroy());
-        callback(err);
-    }
-}
-
-// Function to concatenate MP3 files into a single stream
-function concatenateMP3Files(mp3Files) {
-    const streams = mp3Files.map(filePath => {
+        const filePath = shuffledFiles[currentIndex];
+        
         // Determine the protocol (HTTP or HTTPS) and use the appropriate module
         const protocol = filePath.startsWith('https://') ? https : http;
 
-        // Return a readable stream for each file
-        return protocol.get(filePath);
-    });
+        // If the file path is a URL, stream it directly
+        const request = protocol.get(filePath, (response) => {
+            response.pipe(res, { end: false });
+            response.on('end', () => {
+                currentIndex++;
+                playNext();
+            });
+        }).on('error', (error) => {
+            console.error('Error streaming file:', error);
+        });
 
-    // Create a new ConcatStream
-    const concatenatedStream = new ConcatStream();
-    streams.forEach(stream => concatenatedStream.addStream(stream));
+        // Close the request if the client aborts the connection
+        res.on('close', () => {
+            request.abort();
+        });
+    };
 
-    return concatenatedStream;
+    playNext();
 }
 
 // Route to play MP3 files
@@ -107,6 +81,12 @@ app.get('/play', (req, res) => {
                 return;
             }
 
+            res.status(200).set({
+                'Content-Type': 'audio/mpeg',
+                'Connection': 'keep-alive',
+                'Transfer-Encoding': 'chunked'
+            });
+
             let data = '';
             response.on('data', chunk => {
                 data += chunk;
@@ -119,9 +99,8 @@ app.get('/play', (req, res) => {
                         res.status(400).send('Invalid JSON format or no MP3 files available.');
                         return;
                     }
-                    // Concatenate MP3 files into a single stream
-                    const concatenatedStream = concatenateMP3Files(mp3Files);
-                    concatenatedStream.pipe(res);
+                    // Stream MP3 files
+                    streamMP3Files(mp3Files, res);
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
                     res.status(500).send('Internal Server Error');
