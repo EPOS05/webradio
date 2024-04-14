@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const https = require('https');
-const fs = require('fs');
 const { Readable } = require('stream');
 
 const app = express();
@@ -17,23 +16,15 @@ function shuffleArray(array) {
 
 // Function to stream MP3 files
 function streamMP3Files(mp3Files, res) {
-    const shuffledFiles = shuffleArray([...mp3Files]); // Shuffle the array of files
+    shuffleArray(mp3Files); // Shuffle the array of files
 
-    const stream = new Readable({
-        read() {}
-    });
-
-    let currentIndex = 0;
-
-    const playNext = () => {
-        if (currentIndex >= shuffledFiles.length) {
-            // Loop back to the beginning of the shuffled list
-            currentIndex = 0;
-            shuffleArray(shuffledFiles); // Reshuffle the list for next iteration
+    const playNext = (index) => {
+        if (index >= mp3Files.length) {
+            return; // Finished streaming all files
         }
 
-        const filePath = shuffledFiles[currentIndex];
-        
+        const filePath = mp3Files[index];
+
         // Determine the protocol (HTTP or HTTPS) and use the appropriate module
         const protocol = filePath.startsWith('https://') ? https : http;
 
@@ -41,15 +32,15 @@ function streamMP3Files(mp3Files, res) {
         protocol.get(filePath, (response) => {
             response.pipe(res, { end: false });
             response.on('end', () => {
-                currentIndex++;
-                playNext();
+                playNext(index + 1); // Stream the next file
             });
         }).on('error', (error) => {
             console.error('Error streaming file:', error);
+            playNext(index + 1); // Move to the next file even if there's an error
         });
     };
 
-    playNext();
+    playNext(0); // Start streaming from the first file
 }
 
 // Route to play MP3 files
@@ -90,7 +81,6 @@ app.get('/play', (req, res) => {
                     streamMP3Files(mp3Files, res);
                 } catch (error) {
                     console.error('Error parsing JSON:', error);
-                    console.log('JSON Response:', data);
                     res.status(500).send('Internal Server Error');
                 }
             });
