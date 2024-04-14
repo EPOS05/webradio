@@ -77,8 +77,8 @@ app.get('/play', (req, res) => {
                 try {
                     const json = JSON.parse(data);
                     const mp3Files = json.mp3_files;
-                    if (mp3Files.length === 0) {
-                        return res.status(400).send('No MP3 files available.');
+                    if (!mp3Files || !Array.isArray(mp3Files) || mp3Files.length === 0) {
+                        return res.status(400).send('Invalid JSON format or no MP3 files available.');
                     }
                     // Stream MP3 files
                     streamMP3Files(mp3Files, res);
