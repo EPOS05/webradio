@@ -44,9 +44,11 @@ function streamMP3Files(mp3Files, res) {
         });
 
         // Close the request if the client aborts the connection
-        res.on('close', () => {
+        const closeListener = () => {
             request.abort();
-        });
+            res.removeListener('close', closeListener);
+        };
+        res.on('close', closeListener);
     };
 
     playNext();
