@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const { Readable } = require('stream');
@@ -33,8 +34,11 @@ function streamMP3Files(mp3Files, res) {
 
         const filePath = shuffledFiles[currentIndex];
         
+        // Determine the protocol (HTTP or HTTPS) and use the appropriate module
+        const protocol = filePath.startsWith('https://') ? https : http;
+
         // If the file path is a URL, stream it directly
-        https.get(filePath, (response) => {
+        protocol.get(filePath, (response) => {
             response.pipe(res, { end: false });
             response.on('end', () => {
                 currentIndex++;
@@ -60,7 +64,8 @@ app.get('/play', (req, res) => {
             'Connection': 'keep-alive',
             'Transfer-Encoding': 'chunked'
         });
-        https.get(mp3Url, (response) => {
+        const protocol = mp3Url.startsWith('https://') ? https : http;
+        protocol.get(mp3Url, (response) => {
             response.pipe(res);
         }).on('error', (error) => {
             console.error('Error fetching MP3:', error);
@@ -68,7 +73,8 @@ app.get('/play', (req, res) => {
         });
     } else if (jsonUrl) {
         // Fetch MP3 files from JSON URL
-        https.get(jsonUrl, (response) => {
+        const protocol = jsonUrl.startsWith('https://') ? https : http;
+        protocol.get(jsonUrl, (response) => {
             let data = '';
             response.on('data', chunk => {
                 data += chunk;
