@@ -6,6 +6,9 @@ const { Readable } = require('stream');
 
 const app = express();
 
+// Initialize an empty set to keep track of played files
+const playedFiles = new Set();
+
 // Function to shuffle array
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -17,39 +20,36 @@ function shuffleArray(array) {
 
 // Function to stream MP3 files
 function streamMP3Files(mp3Files, res) {
-    const shuffledFiles = shuffleArray([...mp3Files]); // Shuffle the array of files
-
-    const stream = new Readable({
-        read() {}
-    });
-
-    let currentIndex = 0;
+    let shuffledFiles = shuffleArray([...mp3Files]); // Shuffle the array of files initially
+    const fileQueue = [...shuffledFiles]; // Initialize the file queue with shuffled files
 
     const playNext = () => {
-        if (currentIndex >= shuffledFiles.length) {
-            // Loop back to the beginning of the shuffled list
-            currentIndex = 0;
-            shuffleArray(shuffledFiles); // Reshuffle the list for next iteration
+        if (fileQueue.length === 0) {
+            // All files have been played once, reshuffle the list
+            shuffledFiles = shuffleArray([...mp3Files]);
+            fileQueue.push(...shuffledFiles.filter(file => !playedFiles.has(file)));
+            playedFiles.clear(); // Clear the played files set
         }
 
-        const filePath = shuffledFiles[currentIndex];
-        
-        // Determine the protocol (HTTP or HTTPS) and use the appropriate module
-        const protocol = filePath.startsWith('https://') ? https : http;
+        // Pop the first file from the queue
+        const filePath = fileQueue.shift();
 
-        // If the file path is a URL, stream it directly
+        // Mark the file as played
+        playedFiles.add(filePath);
+
+        // Stream the file
+        const protocol = filePath.startsWith('https://') ? https : http;
         protocol.get(filePath, (response) => {
             response.pipe(res, { end: false });
             response.on('end', () => {
-                currentIndex++;
-                playNext();
+                playNext(); // Play the next file
             });
         }).on('error', (error) => {
             console.error('Error streaming file:', error);
         });
     };
 
-    playNext();
+    playNext(); // Start playing files
 }
 
 // Route to play MP3 files
