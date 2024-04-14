@@ -127,6 +127,7 @@ app.get('/play', (req, res) => {
 // Ping endpoint
 app.get('/ping', (req, res) => {
     res.status(200).send('Ping received');
+    console.log('Ping received to show activity.');
 });
 
 // Function to ping the server every 5 minutes
@@ -134,10 +135,10 @@ const pingServer = () => {
     setInterval(() => {
         axios.get('https://webradio.onrender.com/ping')
             .then(response => {
-                console.log('Server pinged to show activity.');
+                console.log('Ping sent to server to show activity.');
             })
             .catch(error => {
-                console.error('Error pinging server:', error.message);
+                console.error('Error sending ping to server:', error.message);
             });
     }, 5 * 60 * 1000); // 5 minutes in milliseconds
 };
