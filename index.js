@@ -69,14 +69,20 @@ function streamJSONData(jsonUrl, callback) {
         let data = '';
         response.on('data', chunk => {
             data += chunk;
-        });
-        response.on('end', () => {
-            try {
-                const json = JSON.parse(data);
-                callback(null, json);
-            } catch (error) {
-                console.error('Error parsing JSON:', error);
-                callback(error);
+            if (data.length > 1024 * 1024) { // Start streaming MP3 files when first chunk is received (1MB)
+                response.removeAllListeners('data'); // Stop listening for more data
+                try {
+                    const json = JSON.parse(data);
+                    const mp3Files = json.mp3_files;
+                    if (!mp3Files || !Array.isArray(mp3Files) || mp3Files.length === 0) {
+                        return callback(new Error('Invalid JSON format or no MP3 files available.'));
+                    }
+                    // Stream MP3 files
+                    callback(null, mp3Files);
+                } catch (error) {
+                    console.error('Error parsing JSON:', error);
+                    callback(error);
+                }
             }
         });
     }).on('error', (error) => {
@@ -105,15 +111,10 @@ app.get('/play', (req, res) => {
             res.status(500).send('Internal Server Error');
         });
     } else if (jsonUrl) {
-        // Fetch MP3 files from JSON URL
-        streamJSONData(jsonUrl, (error, json) => {
+        // Fetch MP3 files from JSON URL and start streaming
+        streamJSONData(jsonUrl, (error, mp3Files) => {
             if (error) {
                 return res.status(500).send('Internal Server Error');
-            }
-
-            const mp3Files = json.mp3_files;
-            if (!mp3Files || !Array.isArray(mp3Files) || mp3Files.length === 0) {
-                return res.status(400).send('Invalid JSON format or no MP3 files available.');
             }
 
             // Stream MP3 files
