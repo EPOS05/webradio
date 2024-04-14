@@ -34,19 +34,26 @@ function streamMP3Files(mp3Files, res) {
 
         const filePath = shuffledFiles[currentIndex];
         
-        // Determine the protocol (HTTP or HTTPS) and use the appropriate module
-        const protocol = filePath.startsWith('https://') ? https : http;
+        // Check if filePath is a valid string before using it
+        if (typeof filePath === 'string' && (filePath.startsWith('https://') || filePath.startsWith('http://'))) {
+            // Determine the protocol (HTTP or HTTPS) and use the appropriate module
+            const protocol = filePath.startsWith('https://') ? https : http;
 
-        // If the file path is a URL, stream it directly
-        protocol.get(filePath, (response) => {
-            response.pipe(res, { end: false });
-            response.on('end', () => {
-                currentIndex++;
-                playNext();
+            // If the file path is a URL, stream it directly
+            protocol.get(filePath, (response) => {
+                response.pipe(res, { end: false });
+                response.on('end', () => {
+                    currentIndex++;
+                    playNext();
+                });
+            }).on('error', (error) => {
+                console.error('Error streaming file:', error);
             });
-        }).on('error', (error) => {
-            console.error('Error streaming file:', error);
-        });
+        } else {
+            console.error('Invalid file path:', filePath);
+            currentIndex++;
+            playNext(); // Skip to the next file
+        }
     };
 
     playNext();
