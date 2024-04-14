@@ -69,8 +69,26 @@ function streamJSONData(jsonUrl, callback) {
         let data = '';
         response.on('data', chunk => {
             data += chunk;
-            if (data.length > 1024 * 1024) { // Start streaming MP3 files when first chunk is received (1MB)
-                response.removeAllListeners('data'); // Stop listening for more data
+            if (!callback.startedStreaming && data.length > 1024 * 1024) { // Start streaming MP3 files when first chunk is received (1MB)
+                callback.startedStreaming = true;
+                response.pause(); // Pause further data events
+                try {
+                    const json = JSON.parse(data);
+                    const mp3Files = json.mp3_files;
+                    if (!mp3Files || !Array.isArray(mp3Files) || mp3Files.length === 0) {
+                        return callback(new Error('Invalid JSON format or no MP3 files available.'));
+                    }
+                    // Stream MP3 files
+                    callback(null, mp3Files);
+                } catch (error) {
+                    console.error('Error parsing JSON:', error);
+                    callback(error);
+                }
+            }
+        });
+        response.on('end', () => {
+            if (!callback.startedStreaming) {
+                // JSON data received is smaller than 1MB, start streaming MP3 files now
                 try {
                     const json = JSON.parse(data);
                     const mp3Files = json.mp3_files;
