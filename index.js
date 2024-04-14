@@ -71,8 +71,11 @@ function concatenateMP3Files(mp3Files) {
         return protocol.get(filePath);
     });
 
-    // Concatenate all streams into one
-    return new ConcatStream().addStream(Readable.from(streams));
+    // Create a new ConcatStream
+    const concatenatedStream = new ConcatStream();
+    streams.forEach(stream => concatenatedStream.addStream(stream));
+
+    return concatenatedStream;
 }
 
 // Route to play MP3 files
