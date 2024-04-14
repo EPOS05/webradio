@@ -14,20 +14,6 @@ function shuffleArray(array) {
     return array;
 }
 
-// Function to concatenate MP3 files into a single stream
-function concatenateMP3Files(mp3Files) {
-    const streams = mp3Files.map(filePath => {
-        // Determine the protocol (HTTP or HTTPS) and use the appropriate module
-        const protocol = filePath.startsWith('https://') ? https : http;
-
-        // Return a readable stream for each file
-        return protocol.get(filePath);
-    });
-
-    // Concatenate all streams into one
-    return Readable.from(streams).pipe(new ConcatStream());
-}
-
 // ConcatStream class to concatenate multiple streams
 class ConcatStream extends Readable {
     constructor(options) {
@@ -36,6 +22,10 @@ class ConcatStream extends Readable {
         this.streams = [];
         this.currentIndex = 0;
         this.pushedEOF = false;
+
+        this.on('end', () => {
+            this.emit('close');
+        });
     }
 
     _read(size) {
@@ -64,6 +54,25 @@ class ConcatStream extends Readable {
     addStream(stream) {
         this.streams.push(stream);
     }
+
+    _destroy(err, callback) {
+        this.streams.forEach(stream => stream.destroy());
+        callback(err);
+    }
+}
+
+// Function to concatenate MP3 files into a single stream
+function concatenateMP3Files(mp3Files) {
+    const streams = mp3Files.map(filePath => {
+        // Determine the protocol (HTTP or HTTPS) and use the appropriate module
+        const protocol = filePath.startsWith('https://') ? https : http;
+
+        // Return a readable stream for each file
+        return protocol.get(filePath);
+    });
+
+    // Concatenate all streams into one
+    return new ConcatStream().addStream(Readable.from(streams));
 }
 
 // Route to play MP3 files
