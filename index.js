@@ -42,7 +42,9 @@ function streamMP3Files(mp3Files, res) {
             });
         }).on('error', (error) => {
             console.error('Error streaming file:', error);
-            res.end(); // End the response stream on error
+            // Restart streaming when an error occurs
+            currentIndex++;
+            playNext();
         });
 
         // Remove event listener when response stream ends or on error
@@ -58,7 +60,7 @@ function streamMP3Files(mp3Files, res) {
         clearInterval(intervalID);
         intervalID = setInterval(() => {
             res.write('\n'); // Send a newline character as a ping
-            console.log('Server pinged.'); // Log the ping
+            console.log('Server pinged to show activity.'); // Log the ping
         }, 5 * 60 * 1000); // 5 minutes in milliseconds
     };
 
