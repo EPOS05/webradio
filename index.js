@@ -19,6 +19,7 @@ function streamMP3Files(mp3Files, res) {
     const shuffledFiles = shuffleArray([...mp3Files]); // Shuffle the array of files
 
     let currentIndex = 0;
+    let intervalID;
 
     const playNext = () => {
         if (currentIndex >= shuffledFiles.length) {
@@ -53,9 +54,12 @@ function streamMP3Files(mp3Files, res) {
         res.on('close', onClose);
         request.on('close', onClose);
 
-        // Ping the server after each file finishes playing
-        res.write('\n'); // Send an empty chunk as a ping
-        console.log('Ping from server'); // Log the ping
+        // Ping the server every 5 minutes
+        clearInterval(intervalID);
+        intervalID = setInterval(() => {
+            res.write('\n'); // Send a newline character as a ping
+            console.log('Server pinged.'); // Log the ping
+        }, 5 * 60 * 1000); // 5 minutes in milliseconds
     };
 
     playNext();
