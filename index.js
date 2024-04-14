@@ -5,8 +5,19 @@ const { Readable } = require('stream');
 
 const app = express();
 
+// Function to shuffle array
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
 // Function to stream MP3 files
 function streamMP3Files(mp3Files, res) {
+    const shuffledFiles = shuffleArray([...mp3Files]); // Shuffle the array of files
+
     const stream = new Readable({
         read() {}
     });
@@ -14,12 +25,13 @@ function streamMP3Files(mp3Files, res) {
     let currentIndex = 0;
 
     const playNext = () => {
-        if (currentIndex >= mp3Files.length) {
-            // Loop back to the first audio file
+        if (currentIndex >= shuffledFiles.length) {
+            // Loop back to the beginning of the shuffled list
             currentIndex = 0;
+            shuffleArray(shuffledFiles); // Reshuffle the list for next iteration
         }
 
-        const filePath = mp3Files[currentIndex];
+        const filePath = shuffledFiles[currentIndex];
         
         // If the file path is a URL, stream it directly
         https.get(filePath, (response) => {
