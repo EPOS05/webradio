@@ -41,12 +41,17 @@ function streamMP3Files(mp3Files, res) {
             });
         }).on('error', (error) => {
             console.error('Error streaming file:', error);
+            res.end(); // End the response stream on error
         });
 
-        // Close the request if the client aborts the connection
-        res.on('close', () => {
+        // Remove event listener when response stream ends or on error
+        const onClose = () => {
+            res.removeListener('close', onClose);
             request.abort();
-        });
+        };
+
+        res.on('close', onClose);
+        request.on('close', onClose);
     };
 
     playNext();
