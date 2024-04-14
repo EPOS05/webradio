@@ -5,6 +5,9 @@ const { Readable } = require('stream');
 
 const app = express();
 
+// Set maximum listeners for the ServerResponse object to 15
+app.setMaxListeners(15);
+
 // Function to shuffle array
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -46,9 +49,8 @@ function streamMP3Files(mp3Files, res) {
         // Close the request if the client aborts the connection
         const closeListener = () => {
             request.abort();
-            res.removeListener('close', closeListener);
         };
-        res.on('close', closeListener);
+        res.once('close', closeListener); // Use once() to ensure the listener is removed after execution
     };
 
     playNext();
