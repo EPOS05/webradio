@@ -36,6 +36,13 @@ async function streamMP3Files(mp3Files, res) {
     playNext();
 }
 
+// Function to create a continuous playlist
+async function createContinuousPlaylist(mp3Files, res) {
+    while (true) {
+        await streamMP3Files(mp3Files, res);
+    }
+}
+
 // Route to start a new channel
 app.get('/start', async (req, res) => {
     const jsonUrl = req.query.json;
@@ -56,7 +63,7 @@ app.get('/start', async (req, res) => {
         // Store channel ID and MP3 files in active channels map
         activeChannels.set(channelId, mp3Files);
         // Start streaming MP3 files on the channel
-        streamMP3Files(mp3Files, res);
+        createContinuousPlaylist(mp3Files, res);
         // Log the creation of the new channel
         console.log(`New channel created: ${channelId}`);
         // Send the channel ID to the user
@@ -79,7 +86,7 @@ app.get('/play', async (req, res) => {
         'Connection': 'keep-alive',
         'Transfer-Encoding': 'chunked'
     });
-    streamMP3Files(mp3Files, res);
+    createContinuousPlaylist(mp3Files, res);
 });
 
 // Route to stop and delete a channel
