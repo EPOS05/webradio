@@ -1,132 +1,100 @@
 const express = require('express');
 const http = require('http');
 const https = require('https');
-const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
+const { Readable } = require('stream');
 
 const app = express();
+const channels = {}; // Object to store active channels
 
-// Array to store information about currently playing stations
-const playingStations = [];
+// Function to fetch MP3 files from JSON and start streaming
+async function startChannel(jsonUrl) {
+    try {
+        const response = await fetch(jsonUrl);
+        const json = await response.json();
+        const mp3Files = json.mp3_files;
 
-// Function to shuffle array
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-}
-
-// Function to fetch MP3 files from a JSON URL and store them locally
-async function fetchAndStoreMP3Files(jsonUrl) {
-    // Fetch JSON file
-    const fetch = require('node-fetch');
-    const response = await fetch(jsonUrl);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch JSON: ${response.statusText}`);
-    }
-    const json = await response.json();
-    const mp3Files = json.mp3_files;
-
-    // Create directory to store MP3 files if it doesn't exist
-    if (!fs.existsSync('mp3_files')) {
-        fs.mkdirSync('mp3_files');
-    }
-
-    // Fetch and store MP3 files locally
-    mp3Files.forEach(async (mp3Url, index) => {
-        const mp3Filename = `mp3_files/audio_${index}.mp3`;
-        const fileStream = fs.createWriteStream(mp3Filename);
-        const protocol = mp3Url.startsWith('https://') ? https : http;
-        protocol.get(mp3Url, (mp3Response) => {
-            mp3Response.pipe(fileStream);
+        // Create a readable stream to send MP3 files
+        const mp3Stream = new Readable();
+        mp3Stream._read = () => {}; // Required for Readable stream
+        mp3Files.forEach(mp3File => {
+            // Fetch each MP3 file and push it to the stream
+            const protocol = mp3File.startsWith('https://') ? https : http;
+            protocol.get(mp3File, response => {
+                response.on('data', chunk => {
+                    mp3Stream.push(chunk);
+                });
+            });
         });
-    });
+
+        // Add the channel to the channels object
+        const channelId = Math.random().toString(36).substring(7); // Generate random channel ID
+        channels[channelId] = mp3Stream;
+
+        // Log channel creation
+        console.log(`Channel ${channelId} created for JSON: ${jsonUrl}`);
+
+        return channelId;
+    } catch (error) {
+        console.error('Error starting channel:', error);
+        throw new Error('Error starting channel');
+    }
 }
 
-// Function to create HLS playlist for a channel
-function createHLSPlaylist(channelId, res) {
-    const mp3Files = fs.readdirSync('mp3_files');
-    const shuffledFiles = shuffleArray(mp3Files);
-
-    res.writeHead(200, {
-        'Content-Type': 'application/vnd.apple.mpegurl',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-    });
-    
-    shuffledFiles.forEach((file, index) => {
-        const filePath = `mp3_files/${file}`;
-        res.write(`#EXTINF:-1,Audio ${index}\n`);
-        res.write(`${filePath}\n`);
-    });
-
-    res.end();
-}
-
-// Route to start playing MP3 files on a new channel
+// Start a new channel
 app.get('/start', async (req, res) => {
     const jsonUrl = req.query.json;
     if (!jsonUrl) {
-        res.status(400).send('JSON URL not provided.');
+        res.status(400).send('JSON URL not provided');
         return;
     }
 
     try {
-        // Fetch JSON file
-        const fetch = require('node-fetch');
-        const response = await fetch(jsonUrl);
-        if (!response.ok) {
-            res.status(response.status).send('Failed to fetch JSON.');
-            return;
-        }
-        const json = await response.json();
-        
-        // Check if JSON contains valid MP3 files
-        const mp3Files = json.mp3_files;
-        if (!mp3Files || !Array.isArray(mp3Files) || mp3Files.length === 0) {
-            res.status(400).send('Invalid JSON format or no MP3 files available.');
-            return;
-        }
-
-        // Fetch and store MP3 files from JSON URL
-        await fetchAndStoreMP3Files(jsonUrl);
-
-        // Generate a unique ID for the channel
-        const channelId = uuidv4();
-
-        // Add the playing station to the list of playing stations
-        playingStations.push({ id: channelId, startTime: new Date() });
-        console.log(`New channel created: ID ${channelId}`);
-
-        // Send the HLS playlist to the user
-        createHLSPlaylist(channelId, res);
+        const channelId = await startChannel(jsonUrl);
+        res.send(`Channel started. Channel ID: ${channelId}`);
     } catch (error) {
-        console.error('Error starting channel:', error);
-        res.status(500).send('Internal Server Error');
+        res.status(500).send('Error starting channel');
     }
 });
 
-// Route to list currently playing stations
-app.get('/playing', (req, res) => {
-    res.json(playingStations);
-});
-
-// Route to play the HLS playlist for a channel
+// Play an existing channel
 app.get('/play', (req, res) => {
     const channelId = req.query.id;
-    const existingChannel = playingStations.find(channel => channel.id === channelId);
-    if (!existingChannel) {
-        res.status(404).send('Channel not found.');
+    const channel = channels[channelId];
+    if (!channel) {
+        res.status(404).send('Channel not found');
         return;
     }
 
-    createHLSPlaylist(channelId, res);
+    // Send the MP3 stream to the client
+    channel.pipe(res);
 });
 
-// Start the server
-const PORT = process.env.PORT || 10000;
+// Stop and delete an existing channel
+app.get('/stop', (req, res) => {
+    const channelId = req.query.id;
+    const channel = channels[channelId];
+    if (!channel) {
+        res.status(404).send('Channel not found');
+        return;
+    }
+
+    // Close the stream and remove the channel
+    channel.destroy();
+    delete channels[channelId];
+
+    // Log channel deletion
+    console.log(`Channel ${channelId} stopped and deleted`);
+
+    res.send(`Channel ${channelId} stopped and deleted`);
+});
+
+// List all existing channels
+app.get('/playing', (req, res) => {
+    const channelIds = Object.keys(channels);
+    res.json(channelIds);
+});
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
