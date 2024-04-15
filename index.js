@@ -23,8 +23,9 @@ async function streamMP3Files(mp3Files, res) {
         try {
             const response = await axios.get(filePath, { responseType: 'stream' });
             response.data.pipe(res, { end: false });
-            response.data.on('end', () => {
+            response.data.on('end', async () => {
                 currentIndex++;
+                await downloadNextFile(mp3Files, currentIndex);
                 playNext();
             });
         } catch (error) {
@@ -33,14 +34,18 @@ async function streamMP3Files(mp3Files, res) {
         }
     };
 
-    playNext();
-}
+    const downloadNextFile = async (mp3Files, nextIndex) => {
+        if (nextIndex < mp3Files.length) {
+            try {
+                await axios.get(mp3Files[nextIndex], { responseType: 'stream' });
+                console.log(`Downloaded next file: ${mp3Files[nextIndex]}`);
+            } catch (error) {
+                console.error('Error downloading next file:', error.message);
+            }
+        }
+    };
 
-// Function to create a continuous playlist
-async function createContinuousPlaylist(mp3Files, res) {
-    while (true) {
-        await streamMP3Files(mp3Files, res);
-    }
+    playNext();
 }
 
 // Route to start a new channel
@@ -63,7 +68,7 @@ app.get('/start', async (req, res) => {
         // Store channel ID and MP3 files in active channels map
         activeChannels.set(channelId, mp3Files);
         // Start streaming MP3 files on the channel
-        createContinuousPlaylist(mp3Files, res);
+        streamMP3Files(mp3Files, res);
         // Log the creation of the new channel
         console.log(`New channel created: ${channelId}`);
         // Send the channel ID to the user
@@ -86,7 +91,7 @@ app.get('/play', async (req, res) => {
         'Connection': 'keep-alive',
         'Transfer-Encoding': 'chunked'
     });
-    createContinuousPlaylist(mp3Files, res);
+    streamMP3Files(mp3Files, res);
 });
 
 // Route to stop and delete a channel
