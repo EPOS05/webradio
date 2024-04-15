@@ -1,126 +1,54 @@
-const express = require('express');
-const http = require('http');
-const https = require('https');
-const { Readable } = require('stream');
-
-const app = express();
-
-// Function to shuffle array
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+// Route to start playing MP3 files on a new channel
+app.get('/start', async (req, res) => {
+    const jsonUrl = req.query.json;
+    if (!jsonUrl) {
+        res.status(400).send('JSON URL not provided.');
+        return;
     }
-    return array;
-}
 
-// Function to stream MP3 files
-function streamMP3Files(mp3Files, res) {
-    const shuffledFiles = shuffleArray([...mp3Files]); // Shuffle the array of files
-
-    let currentIndex = 0;
-
-    const playNext = () => {
-        if (currentIndex >= shuffledFiles.length) {
-            // Loop back to the beginning of the shuffled list
-            currentIndex = 0;
-            shuffleArray(shuffledFiles); // Reshuffle the list for next iteration
+    try {
+        // Fetch JSON file
+        const response = await fetch(jsonUrl);
+        if (!response.ok) {
+            res.status(response.status).send('Failed to fetch JSON.');
+            return;
+        }
+        const json = await response.json();
+        
+        // Check if JSON contains valid MP3 files
+        const mp3Files = json.mp3_files;
+        if (!mp3Files || !Array.isArray(mp3Files) || mp3Files.length === 0) {
+            res.status(400).send('Invalid JSON format or no MP3 files available.');
+            return;
         }
 
-        const filePath = shuffledFiles[currentIndex];
-        
-        // Determine the protocol (HTTP or HTTPS) and use the appropriate module
-        const protocol = filePath.startsWith('https://') ? https : http;
-
-        // If the file path is a URL, stream it directly
-        const request = protocol.get(filePath, (response) => {
-            response.pipe(res, { end: false });
-            response.on('end', () => {
-                currentIndex++;
-                playNext();
-            });
-        }).on('error', (error) => {
-            console.error('Error streaming file:', error);
-            res.end(); // End the response stream on error
-        });
-
-        // Remove event listener when response stream ends or on error
-        const onClose = () => {
-            res.removeListener('close', onClose);
-            request.abort();
-        };
-
-        res.on('close', onClose);
-        request.on('close', onClose);
-    };
-
-    playNext();
-}
-
-// Route to play MP3 files
-app.get('/play', (req, res) => {
-    const mp3Url = req.query.mp3;
-    const jsonUrl = req.query.json;
-
-    if (mp3Url) {
-        // Stream MP3 file directly
-        res.status(200).set({
-            'Content-Type': 'audio/mpeg',
-            'Connection': 'keep-alive',
-            'Transfer-Encoding': 'chunked'
-        });
-        const protocol = mp3Url.startsWith('https://') ? https : http;
-        protocol.get(mp3Url, (response) => {
-            response.pipe(res);
-        }).on('error', (error) => {
-            console.error('Error fetching MP3:', error);
-            res.status(500).send('Internal Server Error');
-        });
-    } else if (jsonUrl) {
-        // Fetch MP3 files from JSON URL
-        const protocol = jsonUrl.startsWith('https://') ? https : http;
-        protocol.get(jsonUrl, (response) => {
-            if (response.statusCode !== 200) {
-                console.error('Error fetching JSON:', response.statusCode);
-                res.status(response.statusCode).send('Error fetching JSON');
+        // Check if MP3 files are playable
+        for (const mp3Url of mp3Files) {
+            const protocol = mp3Url.startsWith('https://') ? https : http;
+            const response = await protocol.head(mp3Url);
+            if (response.statusCode !== 200 || !response.headers['content-type'].startsWith('audio/')) {
+                res.status(400).send('Invalid MP3 file format or URL.');
                 return;
             }
+        }
 
-            res.status(200).set({
-                'Content-Type': 'audio/mpeg',
-                'Connection': 'keep-alive',
-                'Transfer-Encoding': 'chunked'
-            });
+        // Fetch and store MP3 files from JSON URL
+        await fetchAndStoreMP3Files(jsonUrl);
 
-            let data = '';
-            response.on('data', chunk => {
-                data += chunk;
-            });
-            response.on('end', () => {
-                try {
-                    const json = JSON.parse(data);
-                    const mp3Files = json.mp3_files;
-                    if (!mp3Files || !Array.isArray(mp3Files) || mp3Files.length === 0) {
-                        res.status(400).send('Invalid JSON format or no MP3 files available.');
-                        return;
-                    }
-                    // Stream MP3 files
-                    streamMP3Files(mp3Files, res);
-                } catch (error) {
-                    console.error('Error parsing JSON:', error);
-                    res.status(500).send('Internal Server Error');
-                }
-            });
-        }).on('error', (error) => {
-            console.error('Error fetching JSON:', error);
-            res.status(500).send('Internal Server Error');
-        });
-    } else {
-        res.status(400).send('Neither MP3 URL nor JSON URL provided.');
+        // Generate a unique ID for the channel
+        const channelId = uuidv4();
+
+        // Start streaming MP3 files on the new channel
+        streamMP3Files(channelId, res);
+
+        // Construct the URL for the user
+        const baseUrl = req.protocol + '://' + req.get('host');
+        const channelUrl = `${baseUrl}/channel/${channelId}`;
+
+        // Send the channel URL to the user
+        res.status(200).send(`Channel URL: ${channelUrl}`);
+    } catch (error) {
+        console.error('Error starting channel:', error);
+        res.status(500).send('Internal Server Error');
     }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
 });
