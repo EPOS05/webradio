@@ -134,7 +134,7 @@ app.get('/start', async (req, res) => {
 
         // Construct the URL for the user
         const baseUrl = req.protocol + '://' + req.get('host');
-        const channelUrl = `${baseUrl}/channel/${channelId}`;
+        const channelUrl = `${baseUrl}/play?id=${channelId}`;
 
         // Send the channel URL to the user
         res.status(200).send(`Channel URL: ${channelUrl}`);
@@ -163,14 +163,31 @@ app.get('/stop', (req, res) => {
     }
 });
 
-// Route to check currently playing stations
+// Route to listen to a channel by ID
+app.get('/play', (req, res) => {
+    const channelId = req.query.id;
+    if (!channelId) {
+        res.status(400).send('Channel ID not provided.');
+        return;
+    }
+
+    // Find the playing station with the specified ID
+    const station = playingStations.find(station => station.id === channelId);
+    if (station) {
+        // Stream MP3 files for the specified channel
+        streamMP3Files(channelId, res);
+    } else {
+        res.status(404).send('Channel not found.');
+    }
+});
+
+// Route to list currently playing stations
 app.get('/playing', (req, res) => {
-    const stations = playingStations.map(station => `ID: ${station.id}, Start Time: ${station.startTime}`).join('\n');
-    res.status(200).send(`Currently playing stations:\n${stations}`);
+    res.json(playingStations);
 });
 
 // Start the server
-const port = process.env.PORT || 10000;
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
