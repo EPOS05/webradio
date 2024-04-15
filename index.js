@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
-const fetch = require('node-fetch');
+const fetch = require('node-fetch').default;
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
