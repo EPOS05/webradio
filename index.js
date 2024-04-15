@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
-const fetch = require('node-fetch').default;
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -22,7 +21,8 @@ function shuffleArray(array) {
 // Function to fetch MP3 files from a JSON URL and store them locally
 async function fetchAndStoreMP3Files(jsonUrl) {
     // Fetch JSON file
-    const response = await fetch(jsonUrl);
+    const fetch = await import('node-fetch');
+    const response = await fetch.default(jsonUrl);
     if (!response.ok) {
         throw new Error(`Failed to fetch JSON: ${response.statusText}`);
     }
@@ -97,7 +97,8 @@ app.get('/start', async (req, res) => {
 
     try {
         // Fetch JSON file
-        const response = await fetch(jsonUrl);
+        const fetch = await import('node-fetch');
+        const response = await fetch.default(jsonUrl);
         if (!response.ok) {
             res.status(response.status).send('Failed to fetch JSON.');
             return;
