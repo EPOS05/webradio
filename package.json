@@ -8,6 +8,8 @@
     },
     "dependencies": {
         "express": "^4.19.2",
+        "fs": "^0.0.1-security",
+        "node-fetch": "^3.3.2",
         "uuid": "^9.0.1"
     }
 }

@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
+const fetch = require('node-fetch');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -38,8 +39,14 @@ async function fetchAndStoreMP3Files(jsonUrl) {
         const mp3Filename = `mp3_files/audio_${index}.mp3`;
         const fileStream = fs.createWriteStream(mp3Filename);
         const protocol = mp3Url.startsWith('https://') ? https : http;
-        const response = await protocol.get(mp3Url);
-        response.pipe(fileStream);
+        protocol.get(mp3Url, { method: 'HEAD' }, (response) => {
+            if (response.statusCode !== 200 || !response.headers['content-type'].startsWith('audio/')) {
+                throw new Error(`Invalid MP3 file format or URL: ${mp3Url}`);
+            }
+            protocol.get(mp3Url, (mp3Response) => {
+                mp3Response.pipe(fileStream);
+            });
+        });
     });
 }
 
@@ -107,11 +114,12 @@ app.get('/start', async (req, res) => {
         // Check if MP3 files are playable
         for (const mp3Url of mp3Files) {
             const protocol = mp3Url.startsWith('https://') ? https : http;
-            const response = await protocol.head(mp3Url);
-            if (response.statusCode !== 200 || !response.headers['content-type'].startsWith('audio/')) {
-                res.status(400).send('Invalid MP3 file format or URL.');
-                return;
-            }
+            protocol.get(mp3Url, { method: 'HEAD' }, (response) => {
+                if (response.statusCode !== 200 || !response.headers['content-type'].startsWith('audio/')) {
+                    res.status(400).send('Invalid MP3 file format or URL.');
+                    return;
+                }
+            });
         }
 
         // Fetch and store MP3 files from JSON URL
@@ -143,29 +151,25 @@ app.get('/stop', (req, res) => {
         return;
     }
 
-    // Find the playing station by its ID
-    const stationIndex = playingStations.findIndex(station => station.id === channelId);
-    if (stationIndex === -1) {
-        res.status(404).send('Playing station not found.');
-        return;
-    }
-
     // Remove the playing station from the list of playing stations
-    playingStations.splice(stationIndex, 1);
-
-    // Log that the station has been stopped
-    console.log(`Station with ID ${channelId} has been stopped.`);
-
-    res.status(200).send(`Station with ID ${channelId} has been stopped.`);
+    const index = playingStations.findIndex(station => station.id === channelId);
+    if (index !== -1) {
+        playingStations.splice(index, 1);
+        console.log(`Channel stopped: ID ${channelId}`);
+        res.status(200).send('Channel stopped.');
+    } else {
+        res.status(404).send('Channel not found.');
+    }
 });
 
-// Route to see currently playing stations
+// Route to check currently playing stations
 app.get('/playing', (req, res) => {
-    res.status(200).json(playingStations);
+    const stations = playingStations.map(station => `ID: ${station.id}, Start Time: ${station.startTime}`).join('\n');
+    res.status(200).send(`Currently playing stations:\n${stations}`);
 });
 
 // Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+const port = process.env.PORT || 10000;
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
 });
