@@ -81,10 +81,13 @@ function streamMP3Files(channelId, res) {
     playNext();
 
     // Add the playing station to the list of playing stations
-    playingStations.push({ id: channelId, startTime: new Date() });
-
-    // Log the creation of a new channel
-    console.log(`New channel created: ID ${channelId}`);
+    const existingStationIndex = playingStations.findIndex(station => station.id === channelId);
+    if (existingStationIndex === -1) {
+        playingStations.push({ id: channelId, startTime: new Date() });
+        console.log(`New channel created: ID ${channelId}`);
+    } else {
+        console.log(`Channel resumed: ID ${channelId}`);
+    }
 }
 
 // Route to start playing MP3 files on a new channel
