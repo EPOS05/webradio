@@ -113,6 +113,18 @@ app.get('/playing', (req, res) => {
     res.json(playingStations);
 });
 
+// Route to play the HLS playlist for a channel
+app.get('/play', (req, res) => {
+    const channelId = req.query.id;
+    const existingChannel = playingStations.find(channel => channel.id === channelId);
+    if (!existingChannel) {
+        res.status(404).send('Channel not found.');
+        return;
+    }
+
+    createHLSPlaylist(channelId, res);
+});
+
 // Start the server
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
